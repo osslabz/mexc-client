@@ -21,7 +21,13 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     private volatile boolean connected = false;
 
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable);
+        thread.setDaemon(true);
+        thread.setName("reconnect-monitor");
+        return thread;
+    });
+
 
     public MexcWebSocketClient(URI serverURI, WebSocketListener webSocketListener) {
         super(serverURI);
@@ -102,7 +108,7 @@ public class MexcWebSocketClient extends WebSocketClient {
         }
     }
 
-    public boolean isConnected() {
+    boolean isConnected() {
         return this.connected;
     }
 

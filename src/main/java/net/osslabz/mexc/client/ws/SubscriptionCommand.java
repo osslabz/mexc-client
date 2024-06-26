@@ -9,7 +9,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class SubscriptionRequest {
+public class SubscriptionCommand {
 
     private Integer id;
 

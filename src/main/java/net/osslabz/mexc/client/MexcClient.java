@@ -10,9 +10,9 @@ import net.osslabz.crypto.Interval;
 import net.osslabz.crypto.Ohlc;
 import net.osslabz.mexc.client.ws.Method;
 import net.osslabz.mexc.client.ws.MexcWebSocketClient;
+import net.osslabz.mexc.client.ws.SubscriptionCommand;
+import net.osslabz.mexc.client.ws.SubscriptionCommandResponse;
 import net.osslabz.mexc.client.ws.SubscriptionInfo;
-import net.osslabz.mexc.client.ws.SubscriptionRequest;
-import net.osslabz.mexc.client.ws.SubscriptionResponse;
 import net.osslabz.mexc.client.ws.SubscriptionState;
 import net.osslabz.mexc.client.ws.WebSocketListener;
 
@@ -20,7 +20,6 @@ import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,13 +30,13 @@ import java.util.function.Consumer;
 @Slf4j
 public class MexcClient implements Closeable {
 
-    private final MexcWebSocketClient webSocketClient;
-
-    private final MexcMapper mapper;
-
     private final ObjectMapper objectMapper;
 
-    private final Map<String, SubscriptionInfo> subscriptions = new ConcurrentHashMap<>();
+    private final MexcWebSocketClient webSocketClient;
+
+    private final MexcMapper mapper = new MexcMapper();
+
+    private final Map<String, SubscriptionInfo> activeSubscriptions = new ConcurrentHashMap<>();
 
     private final AtomicInteger openCounter = new AtomicInteger(0);
 
@@ -81,76 +80,109 @@ public class MexcClient implements Closeable {
 
         this.objectMapper = new ObjectMapper();
         this.objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-
-        this.mapper = new MexcMapper();
     }
+
+
+    @Override
+    public void close() {
+
+        if (!activeSubscriptions.isEmpty()) {
+            log.info("Cancelling {} subscription(s) before closing...", activeSubscriptions.size());
+            this.activeSubscriptions.forEach((identifier, subscriptionInfo) -> {
+                try {
+                    this.unsubscribe(identifier);
+                } catch (Exception e) {
+                    log.warn("Couldn't unsubscribe {}. Error: {}", identifier, e.getMessage());
+                }
+            });
+        }
+
+        this.webSocketClient.close();
+    }
+
 
     private void resubscribe() {
-        if (!subscriptions.isEmpty()) {
-            log.info("trying to re-subscription {} subscription(s)", subscriptions.size());
-            this.subscriptions.forEach((identifier, subscriptionInfo) -> this.subscribe(identifier));
+        if (!activeSubscriptions.isEmpty()) {
+            log.info("Trying to re-subscription {} subscription(s)", activeSubscriptions.size());
+            this.activeSubscriptions.forEach((identifier, subscriptionInfo) -> this.subscribe(identifier));
         }
     }
+
 
     private void handleMessage(String message) {
         try {
             JsonNode jsonNode = this.objectMapper.readTree(message);
 
-            if (isResponse(jsonNode)) {
-                SubscriptionResponse subscriptionResponse = this.objectMapper.treeToValue(jsonNode, SubscriptionResponse.class);
-                String subscriptionIdentifier = subscriptionResponse.getMessage();
-
-                if (!this.subscriptions.containsKey(subscriptionIdentifier)) {
-                    log.warn("Unexpected message for subscriptionIdentifier={}: {}", subscriptionIdentifier, message);
-                    return;
-                }
-
-                SubscriptionInfo subscriptionInfo = this.subscriptions.get(subscriptionIdentifier);
-
-                if (Objects.equals(subscriptionResponse.getId(), subscriptionInfo.getSubscribeRequestId())) {
-                    if (subscriptionResponse.isSuccess()) {
-                        subscriptionInfo.setState(SubscriptionState.SUBSCRIBED);
-                        log.info("subscription {} successfully subscribed", subscriptionIdentifier);
-                    } else {
-                        subscriptionInfo.setState(SubscriptionState.SUBSCRIBE_FAILED);
-                        log.info("subscription {} failed with code={}", subscriptionIdentifier, subscriptionResponse.getCode());
-                    }
-                    return;
-                }
-
-                if (Objects.equals(subscriptionResponse.getId(), subscriptionInfo.getUnsubscribeRequestId())) {
-                    if (subscriptionResponse.isSuccess()) {
-                        subscriptions.remove(subscriptionIdentifier);
-                        log.info("subscription {} successfully unsubscribed", subscriptionIdentifier);
-                    } else {
-                        subscriptionInfo.setState(SubscriptionState.UNSUBSCRIBE_FAILED);
-                        log.info("unsubscribing to {} failed with code={}", subscriptionIdentifier, subscriptionResponse.getCode());
-                    }
-                    return;
-                }
+            if (this.isSubscriptionCommandResponse(jsonNode)) {
+                this.processSubscriptionCommandResponse(jsonNode);
+                return;
             }
 
             if (isOhlc(jsonNode)) {
-                OhlcWrapper ohlcWrapper = this.objectMapper.readValue(message, OhlcWrapper.class);
-
-                SubscriptionInfo subscriptionInfo = this.subscriptions.get(ohlcWrapper.getIdentifier());
-
-                Ohlc mappedOhlc = this.mapper.map(subscriptionInfo.getCurrencyPair(), subscriptionInfo.getInterval(), ohlcWrapper);
-                subscriptionInfo.getConsumer().accept(mappedOhlc);
+                processOhlc(message);
                 return;
             }
 
             log.warn("Unknown message received: {}", jsonNode);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new MexcClientException(e);
         }
     }
+
+
+    private void processSubscriptionCommandResponse(JsonNode jsonNode) throws JsonProcessingException {
+
+        SubscriptionCommandResponse subscriptionCommandResponse = this.objectMapper.treeToValue(jsonNode, SubscriptionCommandResponse.class);
+        String subscriptionIdentifier = subscriptionCommandResponse.getMessage();
+
+        if (!this.activeSubscriptions.containsKey(subscriptionIdentifier)) {
+            log.warn("Unexpected message for subscriptionIdentifier={}: {}", subscriptionIdentifier, jsonNode);
+            return;
+        }
+
+        SubscriptionInfo subscriptionInfo = this.activeSubscriptions.get(subscriptionIdentifier);
+
+        if (Objects.equals(subscriptionCommandResponse.getId(), subscriptionInfo.getSubscribeRequestId())) {
+            if (subscriptionCommandResponse.isSuccess()) {
+                subscriptionInfo.setState(SubscriptionState.SUBSCRIBED);
+                log.info("Subscription {} successfully subscribed", subscriptionIdentifier);
+            } else {
+                subscriptionInfo.setState(SubscriptionState.SUBSCRIBE_FAILED);
+                log.warn("Subscribing to {} failed with code={}", subscriptionIdentifier, subscriptionCommandResponse.getCode());
+            }
+            return;
+        }
+
+        if (Objects.equals(subscriptionCommandResponse.getId(), subscriptionInfo.getUnsubscribeRequestId())) {
+            if (subscriptionCommandResponse.isSuccess()) {
+                activeSubscriptions.remove(subscriptionIdentifier);
+                log.info("Subscription {} successfully unsubscribed", subscriptionIdentifier);
+            } else {
+                subscriptionInfo.setState(SubscriptionState.UNSUBSCRIBE_FAILED);
+                log.warn("Unsubscribing from {} failed with code={}", subscriptionIdentifier, subscriptionCommandResponse.getCode());
+            }
+        }
+    }
+
+
+    private void processOhlc(String message) throws JsonProcessingException {
+
+        OhlcWrapper ohlcWrapper = this.objectMapper.readValue(message, OhlcWrapper.class);
+
+        SubscriptionInfo subscriptionInfo = this.activeSubscriptions.get(ohlcWrapper.getIdentifier());
+
+        Ohlc mappedOhlc = this.mapper.map(subscriptionInfo.getCurrencyPair(), subscriptionInfo.getInterval(), ohlcWrapper);
+
+        subscriptionInfo.getConsumer().accept(mappedOhlc);
+    }
+
 
     private boolean isOhlc(JsonNode jsonNode) {
         return jsonNode.has("c");
     }
 
-    private boolean isResponse(JsonNode jsonNode) {
+
+    private boolean isSubscriptionCommandResponse(JsonNode jsonNode) {
         return jsonNode.has("code") && jsonNode.has("msg");
     }
 
@@ -167,36 +199,41 @@ public class MexcClient implements Closeable {
                 .consumer(callback)
                 .build();
 
-        subscriptions.put(subscriptionIdentifier, subscriptionInfo);
+        activeSubscriptions.put(subscriptionIdentifier, subscriptionInfo);
 
         this.subscribe(subscriptionIdentifier);
     }
 
+
     private void subscribe(String subscriptionIdentifier) {
-        int requestId = getNextId();
-        this.subscriptions.get(subscriptionIdentifier).setSubscribeRequestId(requestId);
-        this.send(new SubscriptionRequest(requestId, Method.SUBSCRIPTION, List.of(subscriptionIdentifier)));
+        int requestId = this.getNextRequestId();
+        this.activeSubscriptions.get(subscriptionIdentifier).setSubscribeRequestId(requestId);
+        this.send(new SubscriptionCommand(requestId, Method.SUBSCRIPTION, List.of(subscriptionIdentifier)));
     }
 
 
     public void unsubscribe(CurrencyPair currencyPair, Interval interval) {
-
         String subscriptionIdentifier = mapper.calcSubscriptionIdentifier(currencyPair, interval);
-
         this.unsubscribe(subscriptionIdentifier);
     }
 
     private void unsubscribe(String subscriptionIdentifier) {
-        int requestId = getNextId();
-        this.subscriptions.get(subscriptionIdentifier).setUnsubscribeRequestId(requestId);
-        this.send(new SubscriptionRequest(requestId, Method.UNSUBSCRIPTION, List.of(subscriptionIdentifier)));
+        int requestId = this.getNextRequestId();
+        this.activeSubscriptions.get(subscriptionIdentifier).setUnsubscribeRequestId(requestId);
+        this.send(new SubscriptionCommand(requestId, Method.UNSUBSCRIPTION, List.of(subscriptionIdentifier)));
     }
+
+
+    private int getNextRequestId() {
+        return this.requestIdCounter.incrementAndGet();
+    }
+
 
     private void send(Object o) {
         String jsonString = asJsonString(o);
-
         this.webSocketClient.send(jsonString);
     }
+
 
     private String asJsonString(Object o) {
         try {
@@ -204,20 +241,5 @@ public class MexcClient implements Closeable {
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private int getNextId() {
-        return this.requestIdCounter.incrementAndGet();
-    }
-
-
-    public void close() {
-
-        if (!subscriptions.isEmpty()) {
-            log.info("cancelling {} subscription(s) before closing...", subscriptions.size());
-            this.subscriptions.forEach((identifier, subscriptionInfo) -> this.unsubscribe(identifier));
-        }
-
-        this.webSocketClient.close();
     }
 }

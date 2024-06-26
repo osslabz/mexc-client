@@ -31,8 +31,5 @@ public class MecxClientTest {
         Thread.sleep(10000);
 
         client.unsubscribe(new CurrencyPair("BTC", "USDT"), Interval.PT1M);
-
-        Thread.sleep(1000);
-
     }
 }

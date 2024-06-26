@@ -34,14 +34,14 @@ Usage
 
 ```java
 
-    MexcClient client = new MexcClient();
-    client.subscribe(new CurrencyPair("BTC", "USDT"), Interval.PT1M, ohlc -> {
-        log.debug("{}", ohlc);
-    });
+MexcClient client = new MexcClient();
+client.subscribe(new CurrencyPair("BTC", "USDT"), Interval.PT1M, ohlc -> {
+    log.debug("{}", ohlc);
+});
 
 
-    client.unsubscribe(new CurrencyPair("BTC", "USDT"), Interval.PT1M);
-    client.close();
+client.unsubscribe(new CurrencyPair("BTC", "USDT"), Interval.PT1M);
+client.close();
 ```        
 
 Logging

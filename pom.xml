@@ -20,7 +20,7 @@
         <project.reporting.outputEncoding>${osslabz.encoding}</project.reporting.outputEncoding>
 
         <maven.compiler.release>${osslabz.java.version}</maven.compiler.release>
-        <jackson.version>2.16.1</jackson.version>
+        <jackson.version>2.17.1</jackson.version>
         <lombok.version>1.18.32</lombok.version>
     </properties>
 

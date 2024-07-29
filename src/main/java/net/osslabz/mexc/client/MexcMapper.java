@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
-class MexcMapper {
+public class MexcMapper {
 
     public static final ZoneId ZONE_ID_UTC = ZoneId.of("UTC");
 
@@ -52,7 +52,7 @@ class MexcMapper {
         return content.getVolume().compareTo(BigDecimal.ZERO) > 0 && content.getQuantity().compareTo(BigDecimal.ZERO) > 0 ? content.getVolume().divide(content.getQuantity(), 8, RoundingMode.HALF_UP) : BigDecimal.ZERO;
     }
 
-    String mapInterval(Interval interval) {
+    public String mapInterval(Interval interval) {
         return switch ((int) interval.getDuration().getSeconds()) {
             case 60 -> "Min1";
             case 5 * 60 -> "Min5";
@@ -64,6 +64,10 @@ class MexcMapper {
             case 7 * 24 * 60 * 60 -> "Week1";
             default -> throw new IllegalArgumentException("Unsupported interval %s".formatted(interval));
         };
+    }
+
+    public String mapSymbol(CurrencyPair currencyPair) {
+        return "%s%s".formatted(currencyPair.baseCurrencyCode(), currencyPair.counterCurrencyCode());
     }
 
     String calcSubscriptionIdentifier(CurrencyPair currencyPair, Interval interval) {

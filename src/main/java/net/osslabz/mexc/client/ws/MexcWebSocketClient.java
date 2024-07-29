@@ -102,6 +102,7 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     private void start() {
         try {
+            log.info("Opening connection...");
             this.connected = this.connectBlocking();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);

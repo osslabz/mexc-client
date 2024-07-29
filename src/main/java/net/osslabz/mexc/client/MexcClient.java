@@ -157,6 +157,10 @@ public class MexcClient implements Closeable {
             if (subscriptionCommandResponse.isSuccess()) {
                 activeSubscriptions.remove(subscriptionIdentifier);
                 log.info("Subscription {} successfully unsubscribed", subscriptionIdentifier);
+                if (this.activeSubscriptions.isEmpty()) {
+                    log.info("No open subscriptions, closing connection.");
+                    this.webSocketClient.close();
+                }
             } else {
                 subscriptionInfo.setState(SubscriptionState.UNSUBSCRIBE_FAILED);
                 log.warn("Unsubscribing from {} failed with code={}", subscriptionIdentifier, subscriptionCommandResponse.getCode());

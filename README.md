@@ -1,10 +1,10 @@
 Mexc-Client
 ============
 ![GitHub](https://img.shields.io/github/license/osslabz/mexc-client)
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/osslabz/mexc-client/maven-build.yml?branch=main)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/osslabz/mexc-client/build-on-push.yml?branch=main)
 [![Maven Central](https://img.shields.io/maven-central/v/net.osslabz/mexc-client?label=Maven%20Central)](https://search.maven.org/artifact/net.osslabz/mexc-client)
 
-Connects to [MEXC's Websocket API](https://www.mexc.com/mexc-api) and allows to subscrive to various data channels.
+Connects to [MEXC's Websocket API](https://www.mexc.com/mexc-api) and allows to subscribe to various data channels.
 
 
 Features:

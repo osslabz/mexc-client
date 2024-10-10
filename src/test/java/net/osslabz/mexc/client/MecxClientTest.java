@@ -10,11 +10,11 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 public class MecxClientTest {
 
-    private static MexcClient client;
+    private static PublicMexcClient client;
 
     @BeforeAll
     static void init() {
-        client = new MexcClient();
+        client = new PublicMexcClient();
     }
 
     @AfterAll
@@ -24,12 +24,24 @@ public class MecxClientTest {
 
     @Test
     void testSubscribeKline() throws InterruptedException {
-        client.subscribe(new CurrencyPair("BTC", "USDT"), Interval.PT1M, ohlc -> {
+        client.subscribeToOhlc(new CurrencyPair("BTC", "USDT"), Interval.PT1M, ohlc -> {
             log.debug("{}", ohlc);
         });
 
         Thread.sleep(10000);
 
-        client.unsubscribe(new CurrencyPair("BTC", "USDT"), Interval.PT1M);
+        client.unsubscribeFromOhlc(new CurrencyPair("BTC", "USDT"), Interval.PT1M);
+
+        Thread.sleep(10000);
+
+        client.subscribeToOhlc(new CurrencyPair("ETH", "USDT"), Interval.PT1M, ohlc -> {
+            log.debug("{}", ohlc);
+        });
+
+        Thread.sleep(10000);
+
+        client.unsubscribeFromOhlc(new CurrencyPair("ETH", "USDT"), Interval.PT1M);
+
+        Thread.sleep(10000);
     }
 }

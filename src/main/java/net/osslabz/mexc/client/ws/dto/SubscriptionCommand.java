@@ -1,4 +1,4 @@
-package net.osslabz.mexc.client.ws;
+package net.osslabz.mexc.client.ws.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

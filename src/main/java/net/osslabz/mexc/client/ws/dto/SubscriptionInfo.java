@@ -1,37 +1,25 @@
-package net.osslabz.mexc.client.ws;
-
+package net.osslabz.mexc.client.ws.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import net.osslabz.crypto.CurrencyPair;
-import net.osslabz.crypto.Interval;
+import lombok.experimental.SuperBuilder;
 
 import java.util.function.Consumer;
 
-@Getter
-@Builder
+@Data
+@SuperBuilder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class SubscriptionInfo {
 
-    private CurrencyPair currencyPair;
-
-    private Interval interval;
-
     private String subscriptionIdentifier;
 
-    @Setter
     private Integer subscribeRequestId;
 
-    @Setter
     private Integer unsubscribeRequestId;
 
-    @Setter
     private SubscriptionState state;
-
 
     private Consumer consumer;
 }

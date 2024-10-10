@@ -5,7 +5,7 @@
 
     <groupId>net.osslabz</groupId>
     <artifactId>mexc-client</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.3-SNAPSHOT</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>
@@ -20,7 +20,9 @@
         <project.reporting.outputEncoding>${osslabz.encoding}</project.reporting.outputEncoding>
 
         <maven.compiler.release>${osslabz.java.version}</maven.compiler.release>
+
         <jackson.version>2.18.0</jackson.version>
+        <okhttp.version>4.12.0</okhttp.version>
         <lombok.version>1.18.34</lombok.version>
     </properties>
 
@@ -44,7 +46,7 @@
         <connection>scm:git:ssh://git@github.com/osslabz/evm-abi-decoder.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/osslabz/evm-abi-decoder.git</developerConnection>
         <url>https://github.com/osslabz/evm-abi-decoder</url>
-        <tag>HEAD</tag>
+        <tag>main</tag>
     </scm>
 
     <dependencies>
@@ -54,11 +56,22 @@
             <artifactId>Java-WebSocket</artifactId>
             <version>1.5.7</version>
         </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>logging-interceptor</artifactId>
+            <version>${okhttp.version}</version>
+        </dependency>
+
 
         <dependency>
             <groupId>net.osslabz</groupId>
             <artifactId>crypto-commons</artifactId>
-            <version>0.0.1</version>
+            <version>0.0.2-SNAPSHOT</version>
         </dependency>
 
         <dependency>

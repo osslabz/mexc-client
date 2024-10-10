@@ -1,4 +1,5 @@
-name: maven-publish-release
+name: publish-on-release
+
 on:
   release:
     types: [ created ]
@@ -6,6 +7,11 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Install gpg secret key
         run: |
@@ -13,8 +19,11 @@ jobs:
           cat <(echo -e "${{ secrets.OSSRH_GPG_SECRET_KEY }}") | gpg --batch --import
           # Verify gpg secret key
           gpg --list-secret-keys --keyid-format LONG
-      - uses: actions/checkout@v4
-      - name: Set up JDK
+
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup-jdk
         uses: actions/setup-java@v4
         with:
           java-version: 21
@@ -23,7 +32,8 @@ jobs:
           server-id: ossrh
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
-      - name: Publish package
+
+      - name: publish-on-maven-central
         run: mvn --batch-mode -Dgpg.passphrase=${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD }} -P osslabz-release clean deploy
         env:
           MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}

@@ -36,7 +36,7 @@ public class MexcWebSocketClient extends WebSocketClient {
     }
 
     @Override
-    public void onOpen(ServerHandshake handshakedata) {
+    public void onOpen(ServerHandshake serverHandshake) {
         log.debug("New connection opened");
         this.listener.onOpen();
         this.startMonitoringThread();
@@ -107,6 +107,13 @@ public class MexcWebSocketClient extends WebSocketClient {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public void close() {
+        this.scheduler.shutdown();
+        super.close();
+        this.reconnectMonitorStarted = false;
     }
 
     boolean isConnected() {

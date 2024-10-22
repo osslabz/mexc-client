@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
-        
+
       - name: create-release-notes
         uses: softprops/action-gh-release@v2
         with:

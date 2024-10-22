@@ -1,5 +1,6 @@
 package net.osslabz.mexc.client;
 
+import net.osslabz.crypto.CryptoMathUtils;
 import net.osslabz.crypto.CurrencyPair;
 import net.osslabz.crypto.Exchange;
 import net.osslabz.crypto.Interval;
@@ -137,7 +138,7 @@ public class MexcMapper {
 
 
     BigDecimal calcAvgPrice(RawOhlc.OhlData.OhlcContent content) {
-        return content.getVolume().compareTo(BigDecimal.ZERO) > 0 && content.getQuantity().compareTo(BigDecimal.ZERO) > 0 ? content.getVolume().divide(content.getQuantity(), 8, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        return CryptoMathUtils.isLargerZero(content.getVolume()) && CryptoMathUtils.isLargerZero(content.getQuantity()) ? content.getVolume().divide(content.getQuantity(), 8, RoundingMode.HALF_UP) : BigDecimal.ZERO;
     }
 
 

@@ -1,9 +1,12 @@
 name: build-on-push
 
-on: [ push, pull_request ]
+on:
+  push:
+    branches-ignore:
+      - main
 
 jobs:
-  build:
+  build-on-push:
     runs-on: ubuntu-latest
 
     steps:

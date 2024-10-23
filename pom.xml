@@ -4,7 +4,7 @@
 
     <groupId>net.osslabz</groupId>
     <artifactId>mexc-client</artifactId>
-    <version>0.1.31-SNAPSHOT</version>
+    <version>0.1.31</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>
@@ -18,7 +18,7 @@
         <project.build.sourceEncoding>${osslabz.encoding}</project.build.sourceEncoding>
         <project.reporting.outputEncoding>${osslabz.encoding}</project.reporting.outputEncoding>
 
-        <project.build.outputTimestamp>2024-10-23T00:01:51Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2024-10-23T00:05:23Z</project.build.outputTimestamp>
 
         <maven.compiler.release>${osslabz.java.version}</maven.compiler.release>
 
@@ -47,7 +47,7 @@
         <connection>scm:git:https://github.com/osslabz/mexc-client.git</connection>
         <developerConnection>scm:git:https://github.com/osslabz/mexc-client.git</developerConnection>
         <url>https://github.com/osslabz/mexc-client</url>
-        <tag>main</tag>
+        <tag>0.1.31</tag>
     </scm>
 
     <dependencies>

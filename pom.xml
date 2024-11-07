@@ -73,7 +73,7 @@
         <dependency>
             <groupId>net.osslabz</groupId>
             <artifactId>crypto-commons</artifactId>
-            <version>0.3.4</version>
+            <version>0.4.0</version>
         </dependency>
 
         <dependency>

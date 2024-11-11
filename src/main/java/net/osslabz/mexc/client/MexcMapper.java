@@ -138,7 +138,7 @@ public class MexcMapper {
 
 
     BigDecimal calcAvgPrice(RawOhlc.OhlData.OhlcContent content) {
-        return CryptoMathUtils.isLargerZero(content.getVolume()) && CryptoMathUtils.isLargerZero(content.getQuantity()) ? content.getVolume().divide(content.getQuantity(), 8, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        return CryptoMathUtils.isLargerZero(content.getVolume()) && CryptoMathUtils.isLargerZero(content.getQuantity()) ? content.getVolume().divide(content.getQuantity(), 8, RoundingMode.HALF_UP) : content.getClosePrice();
     }
 
 

@@ -4,7 +4,7 @@
 
     <groupId>net.osslabz</groupId>
     <artifactId>mexc-client</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.1-SNAPSHOT</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>Connects to MEXC's Websocket API and allows to subscribe to various data channels.</description>
@@ -17,7 +17,7 @@
         <project.build.sourceEncoding>${osslabz.encoding}</project.build.sourceEncoding>
         <project.reporting.outputEncoding>${osslabz.encoding}</project.reporting.outputEncoding>
 
-        <project.build.outputTimestamp>2024-10-23T01:14:24Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2024-11-11T09:23:35Z</project.build.outputTimestamp>
 
         <maven.compiler.release>${osslabz.java.version}</maven.compiler.release>
 

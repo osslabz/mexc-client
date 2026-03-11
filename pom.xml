@@ -23,7 +23,7 @@
 
         <jackson.version>2.21</jackson.version>
         <okhttp.version>5.3.2</okhttp.version>
-        <lombok.version>1.18.42</lombok.version>
+        <lombok.version>1.18.44</lombok.version>
     </properties>
 
     <licenses>

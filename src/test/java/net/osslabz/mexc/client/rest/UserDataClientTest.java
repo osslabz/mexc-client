@@ -1,10 +1,12 @@
 package net.osslabz.mexc.client.rest;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+@Tag("live")
 public class UserDataClientTest {
 
     @Test

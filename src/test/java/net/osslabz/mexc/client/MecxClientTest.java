@@ -5,9 +5,11 @@ import net.osslabz.crypto.CurrencyPair;
 import net.osslabz.crypto.Interval;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Slf4j
+@Tag("live")
 public class MecxClientTest {
 
     private static PublicMexcClient client;

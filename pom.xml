@@ -21,7 +21,7 @@
 
         <maven.compiler.release>${osslabz.java.version}</maven.compiler.release>
 
-        <jackson.version>2.22</jackson.version>
+        <jackson.version>2.22.2</jackson.version>
         <okhttp.version>5.5.0</okhttp.version>
         <lombok.version>1.18.48</lombok.version>
     </properties>
@@ -48,6 +48,18 @@
         <url>https://github.com/osslabz/mexc-client</url>
         <tag>0.1.42</tag>
     </scm>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
 
@@ -77,17 +89,14 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
         </dependency>
 
         <dependency>

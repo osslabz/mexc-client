@@ -12,7 +12,7 @@ public class UserDataClientTest {
     @Test
     void testListenKeys() {
 
-        UserDataClient client = new UserDataClient("MEXC_API_KEY_REMOVED", "MEXC_SECRET_KEY_REMOVED");
+        UserDataClient client = new UserDataClient(System.getenv("MEXC_API_KEY"), System.getenv("MEXC_SECRET_KEY"));
         assertEquals(0, client.getListenKeys().size());
 
         String listenKey = client.createListenKey();

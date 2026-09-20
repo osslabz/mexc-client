@@ -50,7 +50,7 @@ public class MexcRestClient {
 
     private OkHttpClient createOkHttpClient() {
         HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor(
-                message -> LoggerFactory.getLogger(this.getClass()).info(message)
+                message -> LoggerFactory.getLogger(this.getClass()).trace(message)
         );
         loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
         return new OkHttpClient.Builder()

@@ -3,6 +3,7 @@ Mexc-Client
 ![GitHub](https://img.shields.io/github/license/osslabz/mexc-client)
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/osslabz/mexc-client/build-on-push.yml?branch=dev&label=build&logo=git)
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/osslabz/mexc-client/build-release-on-main-push.yml?branch=main&label=perform-release&logo=semanticrelease)
+[![Reproducible Builds](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/jvm-repo-rebuild/reproducible-central/master/content/net/osslabz/mexc-client/badge.json)](https://github.com/jvm-repo-rebuild/reproducible-central/blob/master/content/net/osslabz/mexc-client/README.md)
 [![Maven Central](https://img.shields.io/maven-central/v/net.osslabz/mexc-client?label=Maven%20Central)](https://search.maven.org/artifact/net.osslabz/mexc-client)
 
 Connects to [MEXC's Websocket API](https://www.mexc.com/mexc-api) and allows to subscribe to various data channels.

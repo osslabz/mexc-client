@@ -7,6 +7,9 @@ Mexc-Client
 
 Connects to [MEXC's Websocket API](https://www.mexc.com/mexc-api) and allows to subscribe to various data channels.
 
+One author, one release (0.2.0, November 2024), and one known user, a trading bot of mine. The only tests hit the live
+MEXC API and are excluded from the build, so there is no automated coverage and no API stability guarantee.
+
 
 Features:
 ---------
@@ -26,7 +29,7 @@ Maven
 <dependency>
     <groupId>net.osslabz</groupId>
     <artifactId>mexc-client</artifactId>
-    <version>0.0.1</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 

@@ -23,10 +23,13 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     private final AtomicBoolean connected = new AtomicBoolean();
 
+    private final AtomicReference<Thread> monitorThread = new AtomicReference<>();
+
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable);
         thread.setDaemon(true);
         thread.setName("reconnect-monitor");
+        monitorThread.set(thread);
         return thread;
     });
 
@@ -110,6 +113,11 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     @Override
     public void close() {
+        // reconnectBlocking() closes the dropped connection through close(); that must not stop the monitor.
+        if (Thread.currentThread().equals(this.monitorThread.get())) {
+            super.close();
+            return;
+        }
         this.scheduler.shutdown();
         super.close();
         this.reconnectMonitor.set(null);

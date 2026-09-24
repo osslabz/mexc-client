@@ -2,6 +2,7 @@ package net.osslabz.mexc.client;
 
 import static net.osslabz.mexc.client.LocalExchange.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -73,7 +74,7 @@ class PublicMexcClientTest {
     }
 
     @Test
-    void resubscribesAfterTheExchangeDropsTheConnection() throws Exception {
+    void resubscribesEachTimeTheExchangeDropsTheConnection() throws Exception {
         connect(0);
         client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);
         await(() -> state() == SubscriptionState.SUBSCRIBED);
@@ -81,11 +82,14 @@ class PublicMexcClientTest {
         exchange.takeCommand();
         exchange.takeCommand();
 
-        exchange.dropConnections();
+        for (int drop = 1; drop <= 2; drop++) {
+            exchange.dropConnections();
 
-        JsonNode command = exchange.takeCommand();
-        assertEquals("SUBSCRIPTION", command.get("method").asText());
-        assertEquals(CHANNEL, command.get("params").get(0).asText());
+            JsonNode command = exchange.takeCommand();
+            assertNotNull(command, "no resubscription after drop " + drop);
+            assertEquals("SUBSCRIPTION", command.get("method").asText());
+            assertEquals(CHANNEL, command.get("params").get(0).asText());
+        }
     }
 
     @Test

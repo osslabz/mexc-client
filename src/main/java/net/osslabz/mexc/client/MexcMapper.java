@@ -1,5 +1,10 @@
 package net.osslabz.mexc.client;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import net.osslabz.crypto.CryptoMathUtils;
 import net.osslabz.crypto.CurrencyPair;
 import net.osslabz.crypto.Exchange;
@@ -15,12 +20,6 @@ import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
 import net.osslabz.mexc.client.ws.dto.raw.RawOhlc;
 import net.osslabz.mexc.client.ws.dto.raw.RawOrder;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-
 public class MexcMapper {
 
     public static final ZoneId ZONE_ID_UTC = ZoneId.of("UTC");
@@ -31,22 +30,16 @@ public class MexcMapper {
 
         return Ohlc.builder()
                 .asset(new OhlcAsset(new TradingAsset(Exchange.MEXC, currencyPair), interval))
-
                 .updateTime(this.epochMillisToDate(rawOhlc.getTime()))
-
                 .openTime(this.epochSecondsToDate(content.getOpenTime()))
                 .closeTime(this.epochSecondsToDate(content.getCloseTime()))
-
                 .openPrice(content.getOpenPrice())
                 .highPrice(content.getHighPrice())
                 .lowPrice(content.getLowPrice())
                 .closePrice(content.getClosePrice())
-
                 .volume(content.getVolume())
                 .quantity(content.getQuantity())
-
                 .avgPrice(this.calcAvgPrice(content))
-
                 .build();
     }
 
@@ -77,7 +70,8 @@ public class MexcMapper {
     }
 
     private OrderStatus mapStatus(Integer status) {
-        //status 1:New order 2:Filled 3:Partially filled 4:Order canceled 5:Order filled partially, and then the rest of the order is canceled
+        // status 1:New order 2:Filled 3:Partially filled 4:Order canceled 5:Order filled partially, and then the rest
+        // of the order is canceled
 
         return switch (status) {
             case 1:
@@ -117,7 +111,6 @@ public class MexcMapper {
         };
     }
 
-
     private CurrencyPair mapCurrencyPair(String symbol) {
         if (symbol.endsWith("USDT")) {
             String baseCurrencyCode = symbol.substring(0, symbol.indexOf("USDT"));
@@ -126,21 +119,19 @@ public class MexcMapper {
         throw new IllegalArgumentException("Unsupported currency pair: " + symbol);
     }
 
-
     ZonedDateTime epochMillisToDate(long epochMillis) {
         return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZONE_ID_UTC);
     }
-
 
     ZonedDateTime epochSecondsToDate(long epochSeconds) {
         return ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSeconds), ZONE_ID_UTC);
     }
 
-
     BigDecimal calcAvgPrice(RawOhlc.OhlData.OhlcContent content) {
-        return CryptoMathUtils.isLargerZero(content.getVolume()) && CryptoMathUtils.isLargerZero(content.getQuantity()) ? content.getVolume().divide(content.getQuantity(), 8, RoundingMode.HALF_UP) : content.getClosePrice();
+        return CryptoMathUtils.isLargerZero(content.getVolume()) && CryptoMathUtils.isLargerZero(content.getQuantity())
+                ? content.getVolume().divide(content.getQuantity(), 8, RoundingMode.HALF_UP)
+                : content.getClosePrice();
     }
-
 
     public String mapInterval(Interval interval) {
         return switch ((int) interval.getDuration().getSeconds()) {
@@ -156,13 +147,12 @@ public class MexcMapper {
         };
     }
 
-
     public String mapSymbol(CurrencyPair currencyPair) {
         return "%s%s".formatted(currencyPair.baseCurrencyCode(), currencyPair.counterCurrencyCode());
     }
 
-
     String calcSubscriptionIdentifier(CurrencyPair currencyPair, Interval interval) {
-        return "spot@public.kline.v3.api@" + currencyPair.baseCurrencyCode() + currencyPair.counterCurrencyCode() + "@" + mapInterval(interval);
+        return "spot@public.kline.v3.api@" + currencyPair.baseCurrencyCode() + currencyPair.counterCurrencyCode() + "@"
+                + mapInterval(interval);
     }
 }

@@ -14,5 +14,4 @@ public class RawBaseMessage {
 
     @JsonProperty("t")
     private long time;
-
 }

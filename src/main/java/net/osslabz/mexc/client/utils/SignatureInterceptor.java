@@ -1,6 +1,10 @@
 package net.osslabz.mexc.client.utils;
 
-
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
@@ -11,13 +15,6 @@ import okhttp3.Response;
 import okio.Buffer;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
-
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 
 @Slf4j
 public class SignatureInterceptor implements Interceptor {
@@ -30,7 +27,6 @@ public class SignatureInterceptor implements Interceptor {
         this.accessKey = accessKey;
         this.secretKey = secretKey;
     }
-
 
     @NotNull
     @Override
@@ -61,9 +57,11 @@ public class SignatureInterceptor implements Interceptor {
     private Request createBodySignRequest(Request origRequest, RequestBody origBody, String method) {
 
         if (origRequest.url().uri().getPath().equals("/api/v3/batchOrders")) {
-            return origRequest.newBuilder()
+            return origRequest
+                    .newBuilder()
                     .addHeader(HEADER_ACCESS_KEY, accessKey)
-                    .post(RequestBody.create(StringUtils.EMPTY, MediaType.get("application/json"))).build();
+                    .post(RequestBody.create(StringUtils.EMPTY, MediaType.get("application/json")))
+                    .build();
         }
 
         String params = bodyToString(origBody);
@@ -72,29 +70,31 @@ public class SignatureInterceptor implements Interceptor {
         params += "&signature=" + SignatureUtil.actualSignature(originalParamsStr, secretKey);
 
         if ("POST".equals(method)) {
-            return origRequest.newBuilder()
+            return origRequest
+                    .newBuilder()
                     .addHeader(HEADER_ACCESS_KEY, accessKey)
-                    .post(RequestBody.create(params, MediaType.get("text/plain"))).build();
+                    .post(RequestBody.create(params, MediaType.get("text/plain")))
+                    .build();
         } else {
-            return origRequest.newBuilder()
+            return origRequest
+                    .newBuilder()
                     .addHeader(HEADER_ACCESS_KEY, accessKey)
-                    .delete(RequestBody.create(params, MediaType.get("text/plain"))).build();
+                    .delete(RequestBody.create(params, MediaType.get("text/plain")))
+                    .build();
         }
     }
 
     private Request createUrlSignRequest(Request request) {
         String timestamp = Instant.now().toEpochMilli() + "";
         HttpUrl url = request.url();
-        HttpUrl.Builder urlBuilder = url
-                .newBuilder()
-                .setQueryParameter("timestamp", timestamp);
+        HttpUrl.Builder urlBuilder = url.newBuilder().setQueryParameter("timestamp", timestamp);
         String queryParams = urlBuilder.build().query();
         urlBuilder.setQueryParameter("signature", SignatureUtil.actualSignature(queryParams, secretKey));
         return request.newBuilder()
                 .addHeader(HEADER_ACCESS_KEY, accessKey)
-                .url(urlBuilder.build()).build();
+                .url(urlBuilder.build())
+                .build();
     }
-
 
     private String bodyToString(RequestBody body) {
         try {
@@ -135,5 +135,4 @@ public class SignatureInterceptor implements Interceptor {
         }
         return retVal;
     }
-
 }

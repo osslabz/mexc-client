@@ -1,7 +1,5 @@
 package net.osslabz.mexc.client.utils;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -9,6 +7,8 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 public class SignatureUtil {
 
@@ -16,8 +16,7 @@ public class SignatureUtil {
         Mac hmacSha256 = null;
         try {
             hmacSha256 = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secKey =
-                    new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            SecretKeySpec secKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             hmacSha256.init(secKey);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("No such algorithm: " + e.getMessage());
@@ -56,10 +55,16 @@ public class SignatureUtil {
     }
 
     public static String toQueryString(Map<String, String> params) {
-        return params.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(Collectors.joining("&")).substring(1);
+        return params.entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .collect(Collectors.joining("&"))
+                .substring(1);
     }
 
     public static String toQueryStringWithEncoding(Map<String, String> params) {
-        return params.entrySet().stream().map((entry) -> entry.getKey() + "=" + urlEncode(entry.getValue())).collect(Collectors.joining("&")).substring(1);
+        return params.entrySet().stream()
+                .map((entry) -> entry.getKey() + "=" + urlEncode(entry.getValue()))
+                .collect(Collectors.joining("&"))
+                .substring(1);
     }
 }

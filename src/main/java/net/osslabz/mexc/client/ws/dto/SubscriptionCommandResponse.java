@@ -20,5 +20,4 @@ public class SubscriptionCommandResponse {
     public boolean isSuccess() {
         return code == 0;
     }
-
 }

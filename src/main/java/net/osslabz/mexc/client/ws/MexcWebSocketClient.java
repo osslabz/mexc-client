@@ -1,15 +1,14 @@
 package net.osslabz.mexc.client.ws;
 
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.handshake.ServerHandshake;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MexcWebSocketClient extends WebSocketClient {
 
@@ -28,7 +27,6 @@ public class MexcWebSocketClient extends WebSocketClient {
         return thread;
     });
 
-
     public MexcWebSocketClient(URI serverURI, WebSocketListener webSocketListener) {
         super(serverURI);
         this.setConnectionLostTimeout(5);
@@ -42,26 +40,27 @@ public class MexcWebSocketClient extends WebSocketClient {
         this.startMonitoringThread();
     }
 
-
     private void startMonitoringThread() {
 
         if (!this.reconnectMonitorStarted) {
             log.debug("Starting re-reconnect monitor thread...");
-            scheduler.scheduleWithFixedDelay(() -> {
-                try {
-                    if (!this.isOpen()) {
-                        log.debug("Trying to reconnect...");
-                        reconnectBlocking();
-                    }
-                } catch (Exception e) {
-                    log.debug("Couldn't reconnect connection (message={}), will try again!", e.getMessage());
-                }
-            }, 1, 3, TimeUnit.SECONDS);
+            scheduler.scheduleWithFixedDelay(
+                    () -> {
+                        try {
+                            if (!this.isOpen()) {
+                                log.debug("Trying to reconnect...");
+                                reconnectBlocking();
+                            }
+                        } catch (Exception e) {
+                            log.debug("Couldn't reconnect connection (message={}), will try again!", e.getMessage());
+                        }
+                    },
+                    1,
+                    3,
+                    TimeUnit.SECONDS);
             this.reconnectMonitorStarted = true;
         }
-
     }
-
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
@@ -75,13 +74,11 @@ public class MexcWebSocketClient extends WebSocketClient {
         this.listener.onMessage(message);
     }
 
-
     @Override
     public void onMessage(ByteBuffer bytes) {
         log.trace("received binary message={}", bytes);
         this.listener.onMessage(bytes);
     }
-
 
     @Override
     public void onError(Exception e) {

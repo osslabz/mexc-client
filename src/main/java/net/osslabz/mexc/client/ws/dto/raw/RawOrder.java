@@ -1,10 +1,9 @@
 package net.osslabz.mexc.client.ws.dto.raw;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.math.BigDecimal;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.math.BigDecimal;
 
 @Data
 @NoArgsConstructor
@@ -16,7 +15,6 @@ public class RawOrder extends RawBaseMessage {
     @Data
     @NoArgsConstructor
     public static class OrderData {
-
 
         @JsonProperty("A")
         private Long remainAmount;

@@ -2,6 +2,8 @@ package net.osslabz.mexc.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.List;
+import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
 import net.osslabz.crypto.Ohlc;
 import net.osslabz.crypto.Order;
@@ -10,9 +12,6 @@ import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
 import net.osslabz.mexc.client.ws.dto.SubscriptionState;
 import net.osslabz.mexc.client.ws.dto.raw.RawOrder;
 
-import java.util.List;
-import java.util.function.Consumer;
-
 @Slf4j
 public class PrivateMexcClient extends MexcClient {
 
@@ -20,11 +19,9 @@ public class PrivateMexcClient extends MexcClient {
 
     private final UserDataClient userDataClient;
 
-
     public PrivateMexcClient(String accessKey, String secretKey) {
         this.userDataClient = new UserDataClient(accessKey, secretKey);
     }
-
 
     public void subscribeToOrders(Consumer<Ohlc> callback) {
 
@@ -40,11 +37,9 @@ public class PrivateMexcClient extends MexcClient {
         this.subscribe(subscriptionInfo);
     }
 
-
     public void unsubscribeFromOrders() {
         this.unsubscribe(ORDER_SUBSCRIPTION_IDENTIFIER);
     }
-
 
     protected Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
 
@@ -54,11 +49,9 @@ public class PrivateMexcClient extends MexcClient {
         return null;
     }
 
-
     private boolean isOrder(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
         return subscriptionInfo.getSubscriptionIdentifier().equals(ORDER_SUBSCRIPTION_IDENTIFIER);
     }
-
 
     private Order processOrderMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
 
@@ -72,7 +65,6 @@ public class PrivateMexcClient extends MexcClient {
             throw new RuntimeException(e);
         }
     }
-
 
     private String getActiveListenKey() {
         String listenKey = null;

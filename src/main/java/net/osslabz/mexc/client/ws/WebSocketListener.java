@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 public interface WebSocketListener {
 
     void onOpen();
+
     void onMessage(String message);
 
     void onMessage(ByteBuffer bytes);

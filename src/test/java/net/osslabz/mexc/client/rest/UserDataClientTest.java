@@ -1,10 +1,10 @@
 package net.osslabz.mexc.client.rest;
 
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 
 @Tag("live")
 public class UserDataClientTest {
@@ -20,7 +20,5 @@ public class UserDataClientTest {
 
         assertEquals(1, client.getListenKeys().size());
         assertEquals(listenKey, client.getListenKeys().get(0));
-
-
     }
 }

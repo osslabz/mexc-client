@@ -1,11 +1,10 @@
 package net.osslabz.mexc.client.ws.dto;
 
+import java.util.function.Consumer;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-
-import java.util.function.Consumer;
 
 @Data
 @SuperBuilder(toBuilder = true)

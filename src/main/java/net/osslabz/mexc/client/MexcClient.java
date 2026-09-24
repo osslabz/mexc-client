@@ -4,16 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import net.osslabz.mexc.client.ws.MexcWebSocketClient;
-import net.osslabz.mexc.client.ws.WebSocketListener;
-import net.osslabz.mexc.client.ws.dto.Method;
-import net.osslabz.mexc.client.ws.dto.SubscriptionCommand;
-import net.osslabz.mexc.client.ws.dto.SubscriptionCommandResponse;
-import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
-import net.osslabz.mexc.client.ws.dto.SubscriptionState;
-import org.apache.commons.lang3.StringUtils;
-
 import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -23,6 +13,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.extern.slf4j.Slf4j;
+import net.osslabz.mexc.client.ws.MexcWebSocketClient;
+import net.osslabz.mexc.client.ws.WebSocketListener;
+import net.osslabz.mexc.client.ws.dto.Method;
+import net.osslabz.mexc.client.ws.dto.SubscriptionCommand;
+import net.osslabz.mexc.client.ws.dto.SubscriptionCommandResponse;
+import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
+import net.osslabz.mexc.client.ws.dto.SubscriptionState;
+import org.apache.commons.lang3.StringUtils;
 
 @Slf4j
 public abstract class MexcClient implements Closeable {
@@ -40,7 +39,6 @@ public abstract class MexcClient implements Closeable {
     protected String uri;
 
     private MexcWebSocketClient webSocketClient;
-
 
     public MexcClient() {
         this.objectMapper = new ObjectMapper();
@@ -69,20 +67,15 @@ public abstract class MexcClient implements Closeable {
                 }
 
                 @Override
-                public void onError(Exception e) {
-
-                }
+                public void onError(Exception e) {}
 
                 @Override
-                public void onClose(int code, String reason, boolean remote) {
-
-                }
+                public void onClose(int code, String reason, boolean remote) {}
             });
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
     }
-
 
     @Override
     public void close() {
@@ -106,23 +99,23 @@ public abstract class MexcClient implements Closeable {
         this.webSocketClient = null;
     }
 
-
     private void resubscribe() {
         if (!activeSubscriptions.isEmpty()) {
             log.info("Trying to (re-)subscribe {} subscription(s)", activeSubscriptions.size());
-            this.activeSubscriptions.forEach((identifier, ohlcSubscriptionInfo) -> this.subscribe(ohlcSubscriptionInfo));
+            this.activeSubscriptions.forEach(
+                    (identifier, ohlcSubscriptionInfo) -> this.subscribe(ohlcSubscriptionInfo));
         }
     }
 
     protected String getIdentifier(JsonNode jsonNode) {
 
-        if (jsonNode.has("c") && jsonNode.get("c") != null && StringUtils.isNotBlank(jsonNode.get("c").asText())) {
+        if (jsonNode.has("c")
+                && jsonNode.get("c") != null
+                && StringUtils.isNotBlank(jsonNode.get("c").asText())) {
             return jsonNode.get("c").asText();
         }
         return null;
-
     }
-
 
     private void handleMessage(String message) {
         try {
@@ -145,7 +138,6 @@ public abstract class MexcClient implements Closeable {
                 return;
             }
 
-
             Object mapped = this.doHandleMessage(subscriptionInfo, jsonNode);
             if (mapped == null) {
                 log.warn("Unknown message received that won't be processed: {}", jsonNode);
@@ -160,10 +152,10 @@ public abstract class MexcClient implements Closeable {
 
     protected abstract Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode);
 
-
     private void processSubscriptionCommandResponse(JsonNode jsonNode) throws JsonProcessingException {
 
-        SubscriptionCommandResponse subscriptionCommandResponse = this.objectMapper.treeToValue(jsonNode, SubscriptionCommandResponse.class);
+        SubscriptionCommandResponse subscriptionCommandResponse =
+                this.objectMapper.treeToValue(jsonNode, SubscriptionCommandResponse.class);
         String subscriptionIdentifier = subscriptionCommandResponse.getMessage();
 
         if (!this.activeSubscriptions.containsKey(subscriptionIdentifier)) {
@@ -179,7 +171,10 @@ public abstract class MexcClient implements Closeable {
                 log.info("Subscription {} successfully subscribed", subscriptionIdentifier);
             } else {
                 ohlcSubscriptionInfo.setState(SubscriptionState.SUBSCRIBE_FAILED);
-                log.warn("Subscribing to {} failed with code={}", subscriptionIdentifier, subscriptionCommandResponse.getCode());
+                log.warn(
+                        "Subscribing to {} failed with code={}",
+                        subscriptionIdentifier,
+                        subscriptionCommandResponse.getCode());
             }
             return;
         }
@@ -194,25 +189,26 @@ public abstract class MexcClient implements Closeable {
                 }
             } else {
                 ohlcSubscriptionInfo.setState(SubscriptionState.UNSUBSCRIBE_FAILED);
-                log.warn("Unsubscribing from {} failed with code={}", subscriptionIdentifier, subscriptionCommandResponse.getCode());
+                log.warn(
+                        "Unsubscribing from {} failed with code={}",
+                        subscriptionIdentifier,
+                        subscriptionCommandResponse.getCode());
             }
         }
     }
 
-
     private boolean isSubscriptionCommandResponse(JsonNode jsonNode) {
         return jsonNode.has("code") && jsonNode.has("msg");
     }
-
 
     protected void subscribe(SubscriptionInfo subscriptionInfo) {
         int requestId = this.getNextRequestId();
         subscriptionInfo.setSubscribeRequestId(requestId);
         activeSubscriptions.put(subscriptionInfo.getSubscriptionIdentifier(), subscriptionInfo);
 
-        this.send(new SubscriptionCommand(requestId, Method.SUBSCRIPTION, List.of(subscriptionInfo.getSubscriptionIdentifier())));
+        this.send(new SubscriptionCommand(
+                requestId, Method.SUBSCRIPTION, List.of(subscriptionInfo.getSubscriptionIdentifier())));
     }
-
 
     protected void unsubscribe(String subscriptionIdentifier) {
         int requestId = this.getNextRequestId();
@@ -220,11 +216,9 @@ public abstract class MexcClient implements Closeable {
         this.send(new SubscriptionCommand(requestId, Method.UNSUBSCRIPTION, List.of(subscriptionIdentifier)));
     }
 
-
     private int getNextRequestId() {
         return this.requestIdCounter.incrementAndGet();
     }
-
 
     private void send(Object o) {
         String jsonString = asJsonString(o);
@@ -242,7 +236,6 @@ public abstract class MexcClient implements Closeable {
         }
         return webSocketClient;
     }
-
 
     private String asJsonString(Object o) {
         try {

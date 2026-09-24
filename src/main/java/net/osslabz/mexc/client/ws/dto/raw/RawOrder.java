@@ -19,7 +19,7 @@ public class RawOrder extends RawBaseMessage {
         @JsonProperty("A")
         private Long remainAmount;
 
-        @JsonProperty("o")
+        @JsonProperty("O")
         private Long createTime;
 
         @JsonProperty("S")

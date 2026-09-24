@@ -18,9 +18,9 @@ public class SignatureUtil {
             SecretKeySpec secKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             hmacSha256.init(secKey);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("No such algorithm: " + e.getMessage());
+            throw new RuntimeException("No such algorithm: " + e.getMessage(), e);
         } catch (InvalidKeyException e) {
-            throw new RuntimeException("Invalid key: " + e.getMessage());
+            throw new RuntimeException("Invalid key: " + e.getMessage(), e);
         }
         byte[] hash = hmacSha256.doFinal(inputStr.getBytes(StandardCharsets.UTF_8));
         return byte2hex(hash);

@@ -127,6 +127,12 @@
             <version>6.1.3</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver3</artifactId>
+            <version>${okhttp.version}</version>
+            <scope>test</scope>
+        </dependency>
         <!-- default logging impl for tests -->
         <dependency>
             <groupId>ch.qos.logback</groupId>

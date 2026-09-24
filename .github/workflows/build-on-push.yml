@@ -29,9 +29,6 @@ jobs:
       publish-target: central
       publish-branches: dev
       maven-profiles: osslabz-publish
-      # This project's tests call the live exchange API and need credentials CI does not
-      # hold, so they fail wherever they are run here.
-      maven-arguments: -DskipTests
     secrets:
       central-username: ${{ secrets.OSSRH_USERNAME }}
       central-token: ${{ secrets.OSSRH_TOKEN }}

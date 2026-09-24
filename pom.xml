@@ -319,7 +319,7 @@
             </plugins>
         </pluginManagement>
         <plugins>
-            <!-- Every test here talks to the live MEXC API, so none of them can gate a build. -->
+            <!-- Tests tagged live call the MEXC API with real credentials, so they can't gate a build. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

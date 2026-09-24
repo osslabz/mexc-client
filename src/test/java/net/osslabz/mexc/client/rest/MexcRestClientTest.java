@@ -63,6 +63,37 @@ class MexcRestClientTest {
     }
 
     @Test
+    void getSendsTheParametersInTheQuery() throws Exception {
+        server.enqueue(json("{\"listenKey\":[]}"));
+
+        client.get("/api/v3/userDataStream", Map.of("recvWindow", "5000"), ListenKeys.class);
+
+        assertEquals("5000", takeRequest().getUrl().queryParameter("recvWindow"));
+    }
+
+    @Test
+    void putSendsTheParametersAsBody() throws Exception {
+        server.enqueue(json("{\"listenKey\":\"key-1\"}"));
+
+        client.put("/api/v3/userDataStream", Map.of("listenKey", "key-1"), ListenKey.class);
+
+        RecordedRequest request = takeRequest();
+        assertEquals("PUT", request.getMethod());
+        assertEquals("listenKey=key-1", request.getBody().utf8());
+    }
+
+    @Test
+    void deleteSendsTheParametersAsBody() throws Exception {
+        server.enqueue(json("{\"listenKey\":\"key-1\"}"));
+
+        client.delete("/api/v3/userDataStream", Map.of("listenKey", "key-1"), ListenKey.class);
+
+        RecordedRequest request = takeRequest();
+        assertEquals("DELETE", request.getMethod());
+        assertEquals("listenKey=key-1", request.getBody().utf8());
+    }
+
+    @Test
     void anErrorStatusThrowsTheExchangeMessage() {
         server.enqueue(json(400, "{\"code\":\"700002\",\"msg\":\"Signature for this request is not valid.\"}"));
 

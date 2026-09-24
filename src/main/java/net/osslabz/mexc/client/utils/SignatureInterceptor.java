@@ -2,6 +2,7 @@ package net.osslabz.mexc.client.utils;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.HttpUrl;
@@ -37,7 +38,8 @@ public class SignatureInterceptor implements Interceptor {
         String timestamp = Instant.now().toEpochMilli() + "";
         HttpUrl url = request.url();
         HttpUrl.Builder urlBuilder = url.newBuilder().setQueryParameter("timestamp", timestamp);
-        String queryParams = urlBuilder.build().query();
+        // Never null: the timestamp was just added.
+        String queryParams = Objects.requireNonNull(urlBuilder.build().query());
         urlBuilder.setQueryParameter("signature", SignatureUtil.actualSignature(queryParams, secretKey));
         return request.newBuilder()
                 .addHeader(HEADER_ACCESS_KEY, accessKey)

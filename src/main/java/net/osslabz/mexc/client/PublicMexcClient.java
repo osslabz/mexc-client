@@ -43,6 +43,7 @@ public class PublicMexcClient extends MexcClient {
         this.unsubscribe(subscriptionIdentifier);
     }
 
+    @Override
     public Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
         if (isOhlc(subscriptionInfo, jsonNode)) {
             return processOhlcMessage((OhlcSubscriptionInfo) subscriptionInfo, jsonNode);

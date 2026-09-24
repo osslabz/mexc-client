@@ -46,6 +46,7 @@ public class PrivateMexcClient extends MexcClient {
         this.unsubscribe(ORDER_SUBSCRIPTION_IDENTIFIER);
     }
 
+    @Override
     protected Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
 
         if (isOrder(subscriptionInfo, jsonNode)) {

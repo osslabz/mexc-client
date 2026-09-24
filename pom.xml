@@ -24,6 +24,7 @@
         <jackson.version>2.22.2</jackson.version>
         <okhttp.version>5.5.0</okhttp.version>
         <lombok.version>1.18.48</lombok.version>
+        <surefire.excluded.groups>live</surefire.excluded.groups>
 
         <!-- Floors, not targets: this is where coverage stands today, so the gate stops it
              regressing. Raise them as tests land; never lower one to make a build pass. -->
@@ -329,7 +330,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <excludedGroups>live</excludedGroups>
+                    <excludedGroups>${surefire.excluded.groups}</excludedGroups>
                 </configuration>
             </plugin>
             <plugin>

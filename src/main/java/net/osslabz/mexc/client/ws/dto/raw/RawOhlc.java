@@ -21,6 +21,8 @@ public class RawOhlc extends RawBaseMessage {
         @JsonProperty("k")
         private OhlcContent content;
 
+        // public API: making it static changes the published constructor.
+        @SuppressWarnings("ClassCanBeStatic")
         @Data
         @NoArgsConstructor
         public class OhlcContent {

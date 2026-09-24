@@ -9,6 +9,8 @@ import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+// public API: a private constructor would remove the published implicit one.
+@SuppressWarnings("PMD.InstantiableUtilityClass")
 public class SignatureUtil {
 
     public static String actualSignature(String inputStr, String key) {

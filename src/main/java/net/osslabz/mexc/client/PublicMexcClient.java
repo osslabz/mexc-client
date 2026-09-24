@@ -45,8 +45,8 @@ public class PublicMexcClient extends MexcClient {
 
     @Override
     public Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
-        if (isOhlc(subscriptionInfo)) {
-            return processOhlcMessage((OhlcSubscriptionInfo) subscriptionInfo, jsonNode);
+        if (subscriptionInfo instanceof OhlcSubscriptionInfo ohlcSubscriptionInfo && isOhlc(subscriptionInfo)) {
+            return processOhlcMessage(ohlcSubscriptionInfo, jsonNode);
         }
         return null;
     }

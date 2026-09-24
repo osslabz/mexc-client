@@ -122,7 +122,7 @@ public class MexcMapper {
     }
 
     public String mapInterval(Interval interval) {
-        return switch ((int) interval.getDuration().getSeconds()) {
+        return switch ((int) interval.getDuration().toSeconds()) {
             case 60 -> "Min1";
             case 5 * 60 -> "Min5";
             case 15 * 60 -> "Min15";

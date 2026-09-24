@@ -74,40 +74,28 @@ public class MexcMapper {
         // of the order is canceled
 
         return switch (status) {
-            case 1:
-                yield OrderStatus.NEW;
-            case 2:
-                yield OrderStatus.FILLED;
-            case 3:
-                yield OrderStatus.PARTIALLY_FILLED;
-            case 4:
-                yield OrderStatus.CANCELED;
-            case 5:
-                yield OrderStatus.PARTIALLY_CANCELED;
-            default:
-                throw new UnsupportedOperationException("Unsupported status '%d': ".formatted(status));
+            case 1 -> OrderStatus.NEW;
+            case 2 -> OrderStatus.FILLED;
+            case 3 -> OrderStatus.PARTIALLY_FILLED;
+            case 4 -> OrderStatus.CANCELED;
+            case 5 -> OrderStatus.PARTIALLY_CANCELED;
+            default -> throw new UnsupportedOperationException("Unsupported status '%d': ".formatted(status));
         };
     }
 
     private OrderType mapType(Integer tradeType) {
         return switch (tradeType) {
-            case 1:
-                yield OrderType.LIMIT;
-            case 5:
-                yield OrderType.MARKET;
-            default:
-                throw new UnsupportedOperationException("Unsupported tradeType '%d': ".formatted(tradeType));
+            case 1 -> OrderType.LIMIT;
+            case 5 -> OrderType.MARKET;
+            default -> throw new UnsupportedOperationException("Unsupported tradeType '%d': ".formatted(tradeType));
         };
     }
 
     private OrderAction mapAction(Integer type) {
         return switch (type) {
-            case 1:
-                yield OrderAction.BUY;
-            case 2:
-                yield OrderAction.SELL;
-            default:
-                throw new IllegalArgumentException("Invalid order type '%d'".formatted(type));
+            case 1 -> OrderAction.BUY;
+            case 2 -> OrderAction.SELL;
+            default -> throw new IllegalArgumentException("Invalid order type '%d'".formatted(type));
         };
     }
 

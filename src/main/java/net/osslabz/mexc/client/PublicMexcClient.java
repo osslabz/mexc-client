@@ -45,13 +45,13 @@ public class PublicMexcClient extends MexcClient {
 
     @Override
     public Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
-        if (isOhlc(subscriptionInfo, jsonNode)) {
+        if (isOhlc(subscriptionInfo)) {
             return processOhlcMessage((OhlcSubscriptionInfo) subscriptionInfo, jsonNode);
         }
         return null;
     }
 
-    private boolean isOhlc(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
+    private boolean isOhlc(SubscriptionInfo subscriptionInfo) {
         return subscriptionInfo.getSubscriptionIdentifier().startsWith("spot@public.kline.v3.api");
     }
 

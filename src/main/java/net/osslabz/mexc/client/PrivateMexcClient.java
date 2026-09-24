@@ -49,13 +49,13 @@ public class PrivateMexcClient extends MexcClient {
     @Override
     protected Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
 
-        if (isOrder(subscriptionInfo, jsonNode)) {
+        if (isOrder(subscriptionInfo)) {
             return processOrderMessage(subscriptionInfo, jsonNode);
         }
         return null;
     }
 
-    private boolean isOrder(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
+    private boolean isOrder(SubscriptionInfo subscriptionInfo) {
         return subscriptionInfo.getSubscriptionIdentifier().equals(ORDER_SUBSCRIPTION_IDENTIFIER);
     }
 

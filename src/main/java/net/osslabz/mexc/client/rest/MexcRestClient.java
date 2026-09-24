@@ -79,10 +79,9 @@ public class MexcRestClient {
 
     @NotNull
     private String createUrl(String uri, Map<String, String> params) {
-        String url = params != null && !params.isEmpty()
+        return params != null && !params.isEmpty()
                 ? requestHost + uri + "?" + SignatureUtil.toQueryString(params)
                 : requestHost + uri;
-        return url;
     }
 
     <T> T post(String uri, Map<String, String> params, Class<T> clazz) {

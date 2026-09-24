@@ -74,10 +74,14 @@ public abstract class MexcClient implements Closeable {
                 }
 
                 @Override
-                public void onError(Exception e) {}
+                public void onError(Exception e) {
+                    // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
+                }
 
                 @Override
-                public void onClose(int code, String reason, boolean remote) {}
+                public void onClose(int code, String reason, boolean remote) {
+                    // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
+                }
             });
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);

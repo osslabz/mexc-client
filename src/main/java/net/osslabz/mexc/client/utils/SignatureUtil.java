@@ -1,6 +1,5 @@
 package net.osslabz.mexc.client.utils;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
@@ -47,11 +46,7 @@ public class SignatureUtil {
      * @return URL编码后的字符串
      */
     public static String urlEncode(String s) {
-        try {
-            return URLEncoder.encode(s, "UTF-8").replaceAll("\\+", "%20");
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalArgumentException("UTF-8 encoding not supported!");
-        }
+        return URLEncoder.encode(s, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
     }
 
     public static String toQueryString(Map<String, String> params) {

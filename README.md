@@ -8,8 +8,8 @@ Mexc-Client
 
 Connects to [MEXC's Websocket API](https://www.mexc.com/mexc-api) and allows to subscribe to various data channels.
 
-One author, one release (0.2.0, November 2024), and one known user, a trading bot of mine. The only tests hit the live
-MEXC API and are excluded from the build, so there is no automated coverage and no API stability guarantee.
+One author, one release (0.2.0, November 2024), and one known user, a trading bot of mine. There is no API stability
+guarantee.
 
 
 Features:
@@ -75,6 +75,13 @@ Logging
 This project uses slf4j-api but doesn't package an implementation. This is up to the using application. For the
 tests logback is backing slf4j as implementation, with a default configuration logging to STOUT.
 
+
+Tests
+------
+`mvn verify` runs the offline tests against a local HTTP and websocket server, plus PMD, Checkstyle, SpotBugs, Error
+Prone, Spotless and a JaCoCo coverage floor. Tests tagged `live` call the real MEXC API and are excluded from the build;
+`UserDataClientTest` needs `MEXC_API_KEY` and `MEXC_SECRET_KEY`. Run them with
+`mvn test -Dgroups=live -Dsurefire.excluded.groups=`.
 
 Compatibility
 ------

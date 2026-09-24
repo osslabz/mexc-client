@@ -8,6 +8,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import org.java_websocket.WebSocket;
 import org.java_websocket.exceptions.WebsocketNotConnectedException;
@@ -25,7 +26,7 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     private final BlockingQueue<String> openedResources = new LinkedBlockingQueue<>();
 
-    private final CountDownLatch clientClosed = new CountDownLatch(1);
+    private final AtomicInteger clientCloses = new AtomicInteger();
 
     private volatile int subscriptionAnswerCode;
 
@@ -57,8 +58,8 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         return openedResources.poll(5, TimeUnit.SECONDS);
     }
 
-    boolean awaitClientClose() throws InterruptedException {
-        return clientClosed.await(5, TimeUnit.SECONDS);
+    void awaitClientCloses(int count) throws InterruptedException {
+        await(() -> clientCloses.get() >= count);
     }
 
     void push(String message) {
@@ -113,7 +114,7 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     @Override
     public void onClose(WebSocket connection, int code, String reason, boolean remote) {
-        clientClosed.countDown();
+        clientCloses.incrementAndGet();
     }
 
     @Override

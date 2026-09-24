@@ -91,8 +91,10 @@ public abstract class MexcClient implements Closeable {
     @Override
     public void close() {
 
-        if (this.webSocketClient == null) {
-            return;
+        synchronized (this.objectMapper) {
+            if (this.webSocketClient == null) {
+                return;
+            }
         }
 
         if (!activeSubscriptions.isEmpty()) {
@@ -106,8 +108,15 @@ public abstract class MexcClient implements Closeable {
             });
         }
 
-        this.webSocketClient.close();
-        this.webSocketClient = null;
+        // Confirming the last unsubscription closes the client from the read thread, possibly while this runs.
+        MexcWebSocketClient closing;
+        synchronized (this.objectMapper) {
+            closing = this.webSocketClient;
+            this.webSocketClient = null;
+        }
+        if (closing != null) {
+            closing.close();
+        }
     }
 
     private void resubscribe() {

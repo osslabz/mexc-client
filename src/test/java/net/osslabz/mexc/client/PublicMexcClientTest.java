@@ -1,6 +1,7 @@
 package net.osslabz.mexc.client;
 
 import static net.osslabz.mexc.client.LocalExchange.await;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -114,8 +115,30 @@ class PublicMexcClientTest {
 
         client.unsubscribeFromOhlc(BTC_USDT, Interval.PT1M);
 
-        assertTrue(exchange.awaitClientClose());
+        exchange.awaitClientCloses(1);
         assertTrue(client.activeSubscriptions.isEmpty());
+    }
+
+    @Test
+    void closeSurvivesTheExchangeConfirmingTheLastUnsubscriptionFirst() throws Exception {
+        exchange = LocalExchange.start(0);
+        client = new PublicMexcClient(exchange.uri()) {
+            @Override
+            protected void unsubscribe(String subscriptionIdentifier) {
+                super.unsubscribe(subscriptionIdentifier);
+                // The confirmation closes the client from the read thread; let that finish before close() goes on.
+                try {
+                    exchange.awaitClientCloses(1);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }
+        };
+        client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);
+        await(() -> state() == SubscriptionState.SUBSCRIBED);
+
+        assertDoesNotThrow(client::close);
     }
 
     private void connect(int answerCode) throws InterruptedException {

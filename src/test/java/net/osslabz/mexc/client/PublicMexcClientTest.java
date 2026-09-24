@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ch.qos.logback.classic.Level;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -16,6 +18,7 @@ import net.osslabz.crypto.Ohlc;
 import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
 import net.osslabz.mexc.client.ws.dto.SubscriptionState;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class PublicMexcClientTest {
@@ -30,10 +33,18 @@ class PublicMexcClientTest {
 
     private PublicMexcClient client;
 
+    private CapturedLog clientLog;
+
+    @BeforeEach
+    void captureClientLog() {
+        clientLog = CapturedLog.of(MexcClient.class);
+    }
+
     @AfterEach
     void stop() throws InterruptedException {
         client.close();
         exchange.close();
+        clientLog.close();
     }
 
     @Test
@@ -62,6 +73,8 @@ class PublicMexcClientTest {
         assertEquals(BTC_USDT, ohlc.currencyPair());
         assertEquals(Interval.PT1M, ohlc.interval());
         assertTrue(received.isEmpty());
+        List<String> warnings = clientLog.await(Level.WARN, "Received a message without an unmanaged identifier", 1);
+        assertTrue(warnings.get(0).contains("spot@public.kline.v3.api@ETHUSDT@Min1"));
     }
 
     @Test
@@ -71,6 +84,7 @@ class PublicMexcClientTest {
         client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);
 
         await(() -> state() == SubscriptionState.SUBSCRIBE_FAILED);
+        clientLog.await(Level.WARN, "Subscribing to " + CHANNEL + " failed with code=1", 1);
     }
 
     @Test

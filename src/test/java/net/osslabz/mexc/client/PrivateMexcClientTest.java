@@ -4,6 +4,7 @@ import static net.osslabz.mexc.client.rest.LocalServer.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import ch.qos.logback.classic.Level;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -18,6 +19,7 @@ import net.osslabz.crypto.OrderAction;
 import net.osslabz.crypto.OrderStatus;
 import net.osslabz.crypto.OrderType;
 import net.osslabz.mexc.client.rest.LocalServer;
+import net.osslabz.mexc.client.rest.MexcRestClient;
 import net.osslabz.mexc.client.rest.UserDataClient;
 import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
 import org.junit.jupiter.api.AfterEach;
@@ -36,8 +38,11 @@ class PrivateMexcClientTest {
 
     private PrivateMexcClient client;
 
+    private CapturedLog restLog;
+
     @BeforeEach
     void start() throws IOException, InterruptedException {
+        restLog = CapturedLog.of(MexcRestClient.class);
         restServer = new MockWebServer();
         restServer.start();
         exchange = LocalExchange.start(0);
@@ -49,6 +54,7 @@ class PrivateMexcClientTest {
         userDataClient.close();
         exchange.close();
         restServer.close();
+        restLog.close();
     }
 
     @Test
@@ -61,6 +67,7 @@ class PrivateMexcClientTest {
         JsonNode command = exchange.takeCommand();
         assertEquals("SUBSCRIPTION", command.get("method").asText());
         assertEquals(CHANNEL, command.get("params").get(0).asText());
+        awaitResponses(3);
     }
 
     @Test
@@ -70,10 +77,11 @@ class PrivateMexcClientTest {
         client.subscribeToOrders(ignored -> {});
 
         assertEquals("/?listenKey=key-new", exchange.takeOpenedResource());
+        awaitResponses(3);
     }
 
     @Test
-    void subscribeToOrdersFailsWhenTheExchangeRejectsTheApiKey() {
+    void subscribeToOrdersFailsWhenTheExchangeRejectsTheApiKey() throws Exception {
         restServer.setDispatcher(new Dispatcher() {
             @Override
             public MockResponse dispatch(RecordedRequest request) {
@@ -85,6 +93,7 @@ class PrivateMexcClientTest {
 
         RuntimeException e = assertThrows(RuntimeException.class, () -> client.subscribeToOrders(ignored -> {}));
         assertEquals("Api key info invalid", e.getMessage());
+        awaitResponses(2);
     }
 
     @Test
@@ -105,6 +114,12 @@ class PrivateMexcClientTest {
         assertEquals(OrderStatus.NEW, order.getStatus());
         assertEquals(new BigDecimal("76"), order.getPrice());
         assertEquals(ZonedDateTime.parse("2023-11-14T22:13:20.100Z[UTC]"), order.getCreatedAt());
+        awaitResponses(1);
+    }
+
+    /** Waits until the listen key requests, including the keep-alive round at start-up, are answered. */
+    private void awaitResponses(int count) throws InterruptedException {
+        restLog.await(Level.TRACE, "<-- END HTTP", count);
     }
 
     private void connect(String listenKeys) {

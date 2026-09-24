@@ -14,7 +14,7 @@ import org.java_websocket.exceptions.WebsocketNotConnectedException;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
-/** A local stand-in for MEXC's websocket endpoint that answers every command with a fixed code. */
+/** A local stand-in for MEXC's websocket endpoint that answers subscriptions with a fixed code. */
 final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -27,16 +27,16 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     private final CountDownLatch clientClosed = new CountDownLatch(1);
 
-    private volatile int answerCode;
+    private volatile int subscriptionAnswerCode;
 
     private LocalExchange() {
         super(new InetSocketAddress("localhost", 0));
         setReuseAddr(true);
     }
 
-    static LocalExchange start(int answerCode) throws InterruptedException {
+    static LocalExchange start(int subscriptionAnswerCode) throws InterruptedException {
         LocalExchange exchange = new LocalExchange();
-        exchange.answerCode = answerCode;
+        exchange.subscriptionAnswerCode = subscriptionAnswerCode;
         exchange.start();
         if (!exchange.started.await(5, TimeUnit.SECONDS)) {
             throw new IllegalStateException("local exchange did not start");
@@ -101,7 +101,7 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         String answer = OBJECT_MAPPER
                 .createObjectNode()
                 .put("id", command.get("id").asInt())
-                .put("code", answerCode)
+                .put("code", "SUBSCRIPTION".equals(command.get("method").asText()) ? subscriptionAnswerCode : 0)
                 .put("msg", command.get("params").get(0).asText())
                 .toString();
         try {

@@ -4,6 +4,7 @@ import static net.osslabz.mexc.client.rest.LocalServer.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import ch.qos.logback.classic.Level;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +13,7 @@ import mockwebserver3.Dispatcher;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
+import net.osslabz.mexc.client.CapturedLog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,8 +24,11 @@ class UserDataClientOfflineTest {
 
     private UserDataClient client;
 
+    private CapturedLog restLog;
+
     @BeforeEach
     void startServer() throws IOException {
+        restLog = CapturedLog.of(MexcRestClient.class);
         server = new MockWebServer();
         server.start();
     }
@@ -34,6 +39,7 @@ class UserDataClientOfflineTest {
             client.close();
         }
         server.close();
+        restLog.close();
     }
 
     @Test
@@ -66,6 +72,7 @@ class UserDataClientOfflineTest {
         assertEquals(
                 "listenKey=key-2",
                 server.takeRequest(5, TimeUnit.SECONDS).getBody().utf8());
+        restLog.await(Level.TRACE, "<-- END HTTP", 3);
     }
 
     @Test
@@ -83,13 +90,17 @@ class UserDataClientOfflineTest {
         assertEquals(List.of("GET", "GET"), takeMethods(2));
     }
 
-    /** Waits for the requests the test and the keep-alive round at start-up send, in sorted order. */
+    /**
+     * Waits until the requests the test and the keep-alive round at start-up send are answered, and returns their
+     * methods in sorted order.
+     */
     private List<String> takeMethods(int count) throws InterruptedException {
         List<String> methods = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             methods.add(server.takeRequest(5, TimeUnit.SECONDS).getMethod());
         }
         methods.sort(null);
+        restLog.await(Level.TRACE, "<-- END HTTP", count);
         return methods;
     }
 

@@ -3,9 +3,11 @@ package net.osslabz.mexc.client.ws.dto.raw;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 public class RawOrder extends RawBaseMessage {
 

@@ -6,6 +6,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
@@ -20,7 +21,7 @@ public class MexcWebSocketClient extends WebSocketClient {
     private final Object lock = new Object();
     private final AtomicReference<ScheduledFuture<?>> reconnectMonitor = new AtomicReference<>();
 
-    private volatile boolean connected = false;
+    private final AtomicBoolean connected = new AtomicBoolean();
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable);
@@ -101,7 +102,7 @@ public class MexcWebSocketClient extends WebSocketClient {
     private void start() {
         try {
             log.info("Opening connection...");
-            this.connected = this.connectBlocking();
+            this.connected.set(this.connectBlocking());
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -115,7 +116,7 @@ public class MexcWebSocketClient extends WebSocketClient {
     }
 
     boolean isConnected() {
-        return this.connected;
+        return this.connected.get();
     }
 
     public boolean isConnectionAlive() {

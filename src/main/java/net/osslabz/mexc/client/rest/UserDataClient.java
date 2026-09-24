@@ -44,6 +44,6 @@ public class UserDataClient {
     }
 
     private void keepAliveListenKey(String listenKey) {
-        this.restClient.put(USER_DATA_STREAM_LISTEN_KEY, Map.of("listenKey", listenKey), ListenKeys.class);
+        this.restClient.put(USER_DATA_STREAM_LISTEN_KEY, Map.of("listenKey", listenKey), ListenKey.class);
     }
 }

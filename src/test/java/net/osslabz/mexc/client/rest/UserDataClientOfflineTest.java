@@ -55,6 +55,20 @@ class UserDataClientOfflineTest {
     }
 
     @Test
+    void keepsEveryValidListenKeyAliveOnStart() throws Exception {
+        server.setDispatcher(new ExchangeDispatcher("{\"listenKey\":[\"key-1\",\"key-2\"]}"));
+        client = LocalServer.userDataClient(server);
+
+        assertEquals("GET", server.takeRequest(5, TimeUnit.SECONDS).getMethod());
+        assertEquals(
+                "listenKey=key-1",
+                server.takeRequest(5, TimeUnit.SECONDS).getBody().utf8());
+        assertEquals(
+                "listenKey=key-2",
+                server.takeRequest(5, TimeUnit.SECONDS).getBody().utf8());
+    }
+
+    @Test
     void getListenKeysThrowsWhenTheExchangeRejectsTheRequest() throws Exception {
         server.setDispatcher(new Dispatcher() {
             @Override

@@ -56,7 +56,7 @@ public class PrivateMexcClient extends MexcClient {
     }
 
     private boolean isOrder(SubscriptionInfo subscriptionInfo) {
-        return subscriptionInfo.getSubscriptionIdentifier().equals(ORDER_SUBSCRIPTION_IDENTIFIER);
+        return ORDER_SUBSCRIPTION_IDENTIFIER.equals(subscriptionInfo.getSubscriptionIdentifier());
     }
 
     private Order processOrderMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {

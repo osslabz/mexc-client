@@ -36,14 +36,21 @@ public abstract class MexcClient implements Closeable {
 
     private final AtomicInteger requestIdCounter = new AtomicInteger(0);
 
+    final String baseUri;
+
     protected String uri;
 
     private MexcWebSocketClient webSocketClient;
 
     public MexcClient() {
+        this(BASE_URI);
+    }
+
+    MexcClient(String baseUri) {
         this.objectMapper = new ObjectMapper();
         this.objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        this.uri = BASE_URI;
+        this.baseUri = baseUri;
+        this.uri = baseUri;
     }
 
     private void initWebSocketClient() {

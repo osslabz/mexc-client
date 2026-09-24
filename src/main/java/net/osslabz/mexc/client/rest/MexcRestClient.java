@@ -25,6 +25,7 @@ public class MexcRestClient {
 
     private static final ObjectMapper OBJECT_MAPPER;
 
+    private final String requestHost;
     private final String accessKey;
     private final String secretKey;
     private final OkHttpClient okHttpClient;
@@ -38,6 +39,11 @@ public class MexcRestClient {
     }
 
     public MexcRestClient(String accessKey, String secretKey) {
+        this(REQUEST_HOST, accessKey, secretKey);
+    }
+
+    MexcRestClient(String requestHost, String accessKey, String secretKey) {
+        this.requestHost = requestHost;
         this.accessKey = accessKey;
         this.secretKey = secretKey;
 
@@ -72,10 +78,10 @@ public class MexcRestClient {
     }
 
     @NotNull
-    private static String createUrl(String uri, Map<String, String> params) {
+    private String createUrl(String uri, Map<String, String> params) {
         String url = params != null && !params.isEmpty()
-                ? REQUEST_HOST + uri + "?" + SignatureUtil.toQueryString(params)
-                : REQUEST_HOST + uri;
+                ? requestHost + uri + "?" + SignatureUtil.toQueryString(params)
+                : requestHost + uri;
         return url;
     }
 
@@ -105,7 +111,7 @@ public class MexcRestClient {
 
             RequestBody empty = RequestBody.create(null, new byte[0]);
             Request.Builder body = new Request.Builder()
-                    .url(REQUEST_HOST.concat(uri).concat("?").concat(paramsStr))
+                    .url(requestHost.concat(uri).concat("?").concat(paramsStr))
                     .method("POST", empty)
                     .header("Content-Length", "0");
             Response response = okHttpClient.newCall(body.build()).execute();
@@ -119,7 +125,7 @@ public class MexcRestClient {
         try {
             Response response = okHttpClient
                     .newCall(new Request.Builder()
-                            .url(REQUEST_HOST.concat(uri))
+                            .url(requestHost.concat(uri))
                             .put(RequestBody.create(SignatureUtil.toQueryString(params), MediaType.get("text/plain")))
                             .build())
                     .execute();
@@ -134,7 +140,7 @@ public class MexcRestClient {
             return handleResponse(
                     okHttpClient
                             .newCall(new Request.Builder()
-                                    .url(REQUEST_HOST.concat(uri))
+                                    .url(requestHost.concat(uri))
                                     .delete(RequestBody.create(
                                             SignatureUtil.toQueryString(params), MediaType.get("text/plain")))
                                     .build())

@@ -16,7 +16,11 @@ public class UserDataClient {
     private final ScheduledExecutorService scheduler;
 
     public UserDataClient(String acessKey, String secretKey) {
-        this.restClient = new MexcRestClient(acessKey, secretKey);
+        this(new MexcRestClient(acessKey, secretKey));
+    }
+
+    UserDataClient(MexcRestClient restClient) {
+        this.restClient = restClient;
 
         this.scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(

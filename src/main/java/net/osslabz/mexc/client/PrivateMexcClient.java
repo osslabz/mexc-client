@@ -20,13 +20,18 @@ public class PrivateMexcClient extends MexcClient {
     private final UserDataClient userDataClient;
 
     public PrivateMexcClient(String accessKey, String secretKey) {
-        this.userDataClient = new UserDataClient(accessKey, secretKey);
+        this(BASE_URI, new UserDataClient(accessKey, secretKey));
+    }
+
+    PrivateMexcClient(String baseUri, UserDataClient userDataClient) {
+        super(baseUri);
+        this.userDataClient = userDataClient;
     }
 
     public void subscribeToOrders(Consumer<Ohlc> callback) {
 
         String listenKey = this.getActiveListenKey();
-        this.uri = BASE_URI + "?listenKey=" + listenKey;
+        this.uri = this.baseUri + "?listenKey=" + listenKey;
 
         SubscriptionInfo subscriptionInfo = SubscriptionInfo.builder()
                 .subscriptionIdentifier(ORDER_SUBSCRIPTION_IDENTIFIER)

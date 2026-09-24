@@ -15,7 +15,13 @@ import net.osslabz.mexc.client.ws.dto.raw.RawOhlc;
 @Slf4j
 public class PublicMexcClient extends MexcClient {
 
-    public PublicMexcClient() {}
+    public PublicMexcClient() {
+        this(BASE_URI);
+    }
+
+    PublicMexcClient(String baseUri) {
+        super(baseUri);
+    }
 
     public void subscribeToOhlc(CurrencyPair currencyPair, Interval interval, Consumer<Ohlc> callback) {
 

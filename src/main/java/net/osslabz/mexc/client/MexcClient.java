@@ -238,14 +238,12 @@ public abstract class MexcClient implements Closeable {
     }
 
     private MexcWebSocketClient getWebSocketClient() {
-        if (this.webSocketClient == null) {
-            synchronized (this.objectMapper) {
-                if (this.webSocketClient == null) {
-                    initWebSocketClient();
-                }
+        synchronized (this.objectMapper) {
+            if (this.webSocketClient == null) {
+                initWebSocketClient();
             }
+            return this.webSocketClient;
         }
-        return webSocketClient;
     }
 
     private String asJsonString(Object o) {

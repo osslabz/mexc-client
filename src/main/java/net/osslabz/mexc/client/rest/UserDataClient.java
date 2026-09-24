@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import net.osslabz.mexc.client.rest.dto.ListenKey;
 import net.osslabz.mexc.client.rest.dto.ListenKeys;
@@ -15,6 +16,8 @@ public class UserDataClient {
 
     private final ScheduledExecutorService scheduler;
 
+    private final ScheduledFuture<?> listenKeyKeepAlive;
+
     public UserDataClient(String acessKey, String secretKey) {
         this(new MexcRestClient(acessKey, secretKey));
     }
@@ -23,11 +26,12 @@ public class UserDataClient {
         this.restClient = restClient;
 
         this.scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(
+        this.listenKeyKeepAlive = scheduler.scheduleAtFixedRate(
                 () -> this.getListenKeys().forEach(this::keepAliveListenKey), 0, 30, TimeUnit.MINUTES);
     }
 
     public void close() {
+        listenKeyKeepAlive.cancel(false);
         scheduler.shutdown();
     }
 

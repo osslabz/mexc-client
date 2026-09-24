@@ -4,7 +4,9 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.slf4j.Logger;
@@ -16,7 +18,7 @@ public class MexcWebSocketClient extends WebSocketClient {
     private final WebSocketListener listener;
 
     private final Object lock = new Object();
-    private volatile boolean reconnectMonitorStarted = false;
+    private final AtomicReference<ScheduledFuture<?>> reconnectMonitor = new AtomicReference<>();
 
     private volatile boolean connected = false;
 
@@ -42,9 +44,9 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     private void startMonitoringThread() {
 
-        if (!this.reconnectMonitorStarted) {
+        if (this.reconnectMonitor.get() == null) {
             log.debug("Starting re-reconnect monitor thread...");
-            scheduler.scheduleWithFixedDelay(
+            this.reconnectMonitor.set(scheduler.scheduleWithFixedDelay(
                     () -> {
                         try {
                             if (!this.isOpen()) {
@@ -57,8 +59,7 @@ public class MexcWebSocketClient extends WebSocketClient {
                     },
                     1,
                     3,
-                    TimeUnit.SECONDS);
-            this.reconnectMonitorStarted = true;
+                    TimeUnit.SECONDS));
         }
     }
 
@@ -110,7 +111,7 @@ public class MexcWebSocketClient extends WebSocketClient {
     public void close() {
         this.scheduler.shutdown();
         super.close();
-        this.reconnectMonitorStarted = false;
+        this.reconnectMonitor.set(null);
     }
 
     boolean isConnected() {

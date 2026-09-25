@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -21,12 +22,12 @@ import net.osslabz.mexc.client.ws.dto.SubscriptionCommand;
 import net.osslabz.mexc.client.ws.dto.SubscriptionCommandResponse;
 import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
 import net.osslabz.mexc.client.ws.dto.SubscriptionState;
-import org.apache.commons.lang3.StringUtils;
+import net.osslabz.mexc.proto.PushDataV3ApiWrapper;
 
 @Slf4j
 public abstract class MexcClient implements Closeable {
 
-    protected static final String BASE_URI = "wss://wbs.mexc.com/ws";
+    protected static final String BASE_URI = "wss://wbs-api.mexc.com/ws";
 
     protected final ObjectMapper objectMapper;
 
@@ -70,7 +71,7 @@ public abstract class MexcClient implements Closeable {
 
                 @Override
                 public void onMessage(ByteBuffer bytes) {
-                    throw new IllegalArgumentException("Not implemented");
+                    handlePush(bytes);
                 }
 
                 @Override
@@ -131,16 +132,7 @@ public abstract class MexcClient implements Closeable {
         }
     }
 
-    protected String getIdentifier(JsonNode jsonNode) {
-
-        if (jsonNode.has("c")
-                && jsonNode.get("c") != null
-                && StringUtils.isNotBlank(jsonNode.get("c").asText())) {
-            return jsonNode.get("c").asText();
-        }
-        return null;
-    }
-
+    // Commands and their answers are JSON text frames; the data itself arrives as binary protobuf pushes.
     private void handleMessage(String message) {
         try {
             JsonNode jsonNode = this.objectMapper.readTree(message);
@@ -149,32 +141,43 @@ public abstract class MexcClient implements Closeable {
                 this.processSubscriptionCommandResponse(jsonNode);
                 return;
             }
-
-            String identifier = this.getIdentifier(jsonNode);
-            if (identifier == null) {
-                log.warn("Received a message without an identifier, won't be processed: {}", message);
-                return;
-            }
-
-            SubscriptionInfo subscriptionInfo = this.activeSubscriptions.get(identifier);
-            if (subscriptionInfo == null) {
-                log.warn("Received a message without an unmanaged identifier, won't be processed: {}", message);
-                return;
-            }
-
-            Object mapped = this.doHandleMessage(subscriptionInfo, jsonNode);
-            if (mapped == null) {
-                log.warn("Unknown message received that won't be processed: {}", jsonNode);
-            }
-
-            subscriptionInfo.getConsumer().accept(mapped);
+            log.warn("Received a text message that answers no command, won't be processed: {}", message);
 
         } catch (JsonProcessingException e) {
             throw new MexcClientException(e);
         }
     }
 
-    protected abstract Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode);
+    private void handlePush(ByteBuffer bytes) {
+        PushDataV3ApiWrapper push;
+        try {
+            push = PushDataV3ApiWrapper.parseFrom(bytes);
+        } catch (InvalidProtocolBufferException e) {
+            log.warn("Received a push that is no protobuf message, won't be processed: {}", e.getMessage());
+            return;
+        }
+        log.trace("Received push: {}", push);
+
+        SubscriptionInfo subscriptionInfo = this.activeSubscriptions.get(push.getChannel());
+        if (subscriptionInfo == null) {
+            log.warn("Received a push for an unmanaged channel, won't be processed: {}", push.getChannel());
+            return;
+        }
+
+        Object mapped = this.doHandleMessage(subscriptionInfo, push);
+        if (mapped == null) {
+            log.warn(
+                    "Received a push with an unexpected {} body on {}, won't be processed",
+                    push.getBodyCase(),
+                    push.getChannel());
+            return;
+        }
+
+        subscriptionInfo.getConsumer().accept(mapped);
+    }
+
+    /** Maps a push of a managed channel, or returns null if the push carries nothing this client maps. */
+    protected abstract Object doHandleMessage(SubscriptionInfo subscriptionInfo, PushDataV3ApiWrapper push);
 
     private void processSubscriptionCommandResponse(JsonNode jsonNode) throws JsonProcessingException {
 

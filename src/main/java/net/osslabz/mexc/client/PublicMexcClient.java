@@ -1,7 +1,5 @@
 package net.osslabz.mexc.client;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
 import net.osslabz.crypto.CurrencyPair;
@@ -10,7 +8,7 @@ import net.osslabz.crypto.Ohlc;
 import net.osslabz.mexc.client.ws.dto.OhlcSubscriptionInfo;
 import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
 import net.osslabz.mexc.client.ws.dto.SubscriptionState;
-import net.osslabz.mexc.client.ws.dto.raw.RawOhlc;
+import net.osslabz.mexc.proto.PushDataV3ApiWrapper;
 
 @Slf4j
 public class PublicMexcClient extends MexcClient {
@@ -44,28 +42,13 @@ public class PublicMexcClient extends MexcClient {
     }
 
     @Override
-    public Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
-        if (subscriptionInfo instanceof OhlcSubscriptionInfo ohlcSubscriptionInfo && isOhlc(subscriptionInfo)) {
-            return processOhlcMessage(ohlcSubscriptionInfo, jsonNode);
+    public Object doHandleMessage(SubscriptionInfo subscriptionInfo, PushDataV3ApiWrapper push) {
+        if (subscriptionInfo instanceof OhlcSubscriptionInfo ohlcSubscriptionInfo && push.hasPublicSpotKline()) {
+            Ohlc ohlc =
+                    this.mapper.map(ohlcSubscriptionInfo.getCurrencyPair(), ohlcSubscriptionInfo.getInterval(), push);
+            log.trace("Mapped OHLC: {}", ohlc);
+            return ohlc;
         }
         return null;
-    }
-
-    private boolean isOhlc(SubscriptionInfo subscriptionInfo) {
-        return subscriptionInfo.getSubscriptionIdentifier().startsWith("spot@public.kline.v3.api");
-    }
-
-    private Ohlc processOhlcMessage(OhlcSubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
-
-        try {
-            RawOhlc rawOhlc = this.objectMapper.treeToValue(jsonNode, RawOhlc.class);
-            log.trace("OHLC from exchange: {}", rawOhlc);
-            Ohlc mappedOhlc =
-                    this.mapper.map(subscriptionInfo.getCurrencyPair(), subscriptionInfo.getInterval(), rawOhlc);
-            log.trace("Mapped OHLC: {}", mappedOhlc);
-            return mappedOhlc;
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
     }
 }

@@ -7,6 +7,7 @@ Mexc-Client
 [![Maven Central](https://img.shields.io/maven-central/v/net.osslabz/mexc-client?label=Maven%20Central)](https://search.maven.org/artifact/net.osslabz/mexc-client)
 
 Connects to [MEXC's Websocket API](https://www.mexc.com/mexc-api) and allows to subscribe to various data channels.
+It uses the protobuf channels on `wss://wbs-api.mexc.com/ws`; MEXC refuses the older JSON channels.
 
 One author, one release (0.2.0, November 2024), and one known user, a trading bot of mine. There is no API stability
 guarantee.
@@ -90,8 +91,9 @@ Tests
 ------
 `mvn verify` runs the offline tests against a local HTTP and websocket server, plus PMD, Checkstyle, SpotBugs, Error
 Prone, Spotless and a JaCoCo coverage floor. Tests tagged `live` call the real MEXC API and are excluded from the build;
-`UserDataClientTest` needs `MEXC_API_KEY` and `MEXC_SECRET_KEY`. Run them with
-`mvn test -Dgroups=live -Dsurefire.excluded.groups=`.
+`UserDataClientTest` and `PrivateMexcClientLiveTest` need `MEXC_API_KEY` and `MEXC_SECRET_KEY`. Run them with
+`mvn test -Dgroups=live -Dsurefire.excluded.groups=`. `PrivateMexcClientLiveTest` waits two minutes for an order you
+place on that account meanwhile.
 
 Protobuf schemas
 ------

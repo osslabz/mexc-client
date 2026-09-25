@@ -1,6 +1,7 @@
 package net.osslabz.mexc.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
@@ -15,8 +16,9 @@ import net.osslabz.crypto.OrderAction;
 import net.osslabz.crypto.OrderStatus;
 import net.osslabz.crypto.OrderType;
 import net.osslabz.crypto.TradingAsset;
-import net.osslabz.mexc.client.ws.dto.raw.RawOhlc;
-import net.osslabz.mexc.client.ws.dto.raw.RawOrder;
+import net.osslabz.mexc.proto.PrivateOrdersV3Api;
+import net.osslabz.mexc.proto.PublicSpotKlineV3Api;
+import net.osslabz.mexc.proto.PushDataV3ApiWrapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -44,16 +46,15 @@ class MexcMapperTest {
     }
 
     @Test
-    void subscriptionIdentifierNamesTheKlineChannel() {
+    void subscriptionIdentifierNamesTheProtobufKlineChannel() {
         assertEquals(
-                "spot@public.kline.v3.api@BTCUSDT@Min15", mapper.calcSubscriptionIdentifier(BTC_USDT, Interval.PT15M));
+                "spot@public.kline.v3.api.pb@BTCUSDT@Min15",
+                mapper.calcSubscriptionIdentifier(BTC_USDT, Interval.PT15M));
     }
 
     @Test
     void mapsAKlineToAnOhlcWithTheVolumeWeightedAveragePrice() {
-        RawOhlc rawOhlc = rawOhlc(new BigDecimal("300"), new BigDecimal("4"));
-
-        Ohlc ohlc = mapper.map(BTC_USDT, Interval.PT1M, rawOhlc);
+        Ohlc ohlc = mapper.map(BTC_USDT, Interval.PT1M, klinePush("4", "300"));
 
         assertEquals(new OhlcAsset(new TradingAsset(Exchange.MEXC, BTC_USDT), Interval.PT1M), ohlc.getAsset());
         assertEquals(ZonedDateTime.parse("2023-11-14T22:13:20.123Z[UTC]"), ohlc.getUpdateTime());
@@ -70,16 +71,14 @@ class MexcMapperTest {
 
     @Test
     void usesTheClosePriceAsAveragePriceWhenNothingTraded() {
-        RawOhlc rawOhlc = rawOhlc(BigDecimal.ZERO, BigDecimal.ZERO);
-
-        Ohlc ohlc = mapper.map(BTC_USDT, Interval.PT1M, rawOhlc);
+        Ohlc ohlc = mapper.map(BTC_USDT, Interval.PT1M, klinePush("0", "0"));
 
         assertEquals(new BigDecimal("75"), ohlc.getAvgPrice());
     }
 
     @Test
     void mapsAnOrderUpdate() {
-        Order order = mapper.map(null, rawOrder("BTCUSDT", 2));
+        Order order = mapper.map(orderPush("BTCUSDT", 2));
 
         assertEquals("order-1", order.getExchangeOrderId());
         assertEquals("client-1", order.getClientOrderId());
@@ -97,19 +96,38 @@ class MexcMapperTest {
         assertEquals(ZonedDateTime.parse("2023-11-14T22:13:20.456Z[UTC]"), order.getUpdatedAt());
     }
 
+    @Test
+    void takesTheUpdateTimeFromTheCreateTimeOfThePushWhenItHasOne() {
+        PushDataV3ApiWrapper push = orderPush("BTCUSDT", 2).toBuilder()
+                .setCreateTime(1_700_000_000_789L)
+                .build();
+
+        assertEquals(
+                ZonedDateTime.parse("2023-11-14T22:13:20.789Z[UTC]"),
+                mapper.map(push).getUpdatedAt());
+    }
+
+    @Test
+    void mapsFieldsMexcLeavesOutToNull() {
+        PushDataV3ApiWrapper push = orderPush("BTCUSDT", 2).toBuilder()
+                .setPrivateOrders(order(2).clearClientId().clearAvgPrice())
+                .build();
+
+        Order order = mapper.map(push);
+
+        assertNull(order.getClientOrderId());
+        assertNull(order.getAvgPrice());
+    }
+
     @ParameterizedTest
     @CsvSource({"1,NEW", "2,FILLED", "3,PARTIALLY_FILLED", "4,CANCELED", "5,PARTIALLY_CANCELED"})
     void mapsEveryOrderStatus(int status, OrderStatus expected) {
-        assertEquals(expected, mapper.map(null, rawOrder("BTCUSDT", status)).getStatus());
+        assertEquals(expected, mapper.map(orderPush("BTCUSDT", status)).getStatus());
     }
 
     @Test
     void mapsAMarketBuyOrder() {
-        RawOrder rawOrder = rawOrder("BTCUSDT", 1);
-        rawOrder.getData().setTradeType(5);
-        rawOrder.getData().setType(1);
-
-        Order order = mapper.map(null, rawOrder);
+        Order order = mapper.map(orderPush(order(1).setOrderType(5).setTradeType(1)));
 
         assertEquals(OrderType.MARKET, order.getType());
         assertEquals(OrderAction.BUY, order.getAction());
@@ -117,75 +135,84 @@ class MexcMapperTest {
 
     @Test
     void mapOrderRejectsAnUnknownOrderType() {
-        RawOrder rawOrder = rawOrder("BTCUSDT", 1);
-        rawOrder.getData().setTradeType(3);
+        PushDataV3ApiWrapper push = orderPush(order(1).setOrderType(3));
 
-        assertThrows(UnsupportedOperationException.class, () -> mapper.map(null, rawOrder));
+        assertThrows(UnsupportedOperationException.class, () -> mapper.map(push));
     }
 
     @Test
     void mapOrderRejectsAnUnknownSide() {
-        RawOrder rawOrder = rawOrder("BTCUSDT", 1);
-        rawOrder.getData().setType(3);
+        PushDataV3ApiWrapper push = orderPush(order(1).setTradeType(3));
 
-        assertThrows(IllegalArgumentException.class, () -> mapper.map(null, rawOrder));
+        assertThrows(IllegalArgumentException.class, () -> mapper.map(push));
     }
 
     @Test
     void mapOrderRejectsAnUnknownStatus() {
-        RawOrder rawOrder = rawOrder("BTCUSDT", 9);
+        PushDataV3ApiWrapper push = orderPush("BTCUSDT", 9);
 
-        assertThrows(UnsupportedOperationException.class, () -> mapper.map(null, rawOrder));
+        assertThrows(UnsupportedOperationException.class, () -> mapper.map(push));
     }
 
     @Test
     void mapOrderRejectsAPairNotQuotedInUsdt() {
-        RawOrder rawOrder = rawOrder("BTCUSDC", 2);
+        PushDataV3ApiWrapper push = orderPush("BTCUSDC", 2);
 
-        assertThrows(IllegalArgumentException.class, () -> mapper.map(null, rawOrder));
+        assertThrows(IllegalArgumentException.class, () -> mapper.map(push));
     }
 
     @Test
-    void mapOrderRejectsAMessageWithoutOrderData() {
-        assertThrows(IllegalArgumentException.class, () -> mapper.map(null, new RawOrder()));
+    void mapOrderRejectsAPushWithoutAnOrder() {
+        PushDataV3ApiWrapper push = klinePush("4", "300");
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> mapper.map(push));
+        assertEquals("The push carries no order: PUBLICSPOTKLINE", e.getMessage());
     }
 
-    private static RawOrder rawOrder(String symbol, int status) {
-        RawOrder.OrderData data = new RawOrder.OrderData();
-        data.setOrderId("order-1");
-        data.setClientOrderId("client-1");
-        data.setType(2);
-        data.setTradeType(1);
-        data.setStatus(status);
-        data.setQuantity(new BigDecimal("2"));
-        data.setCumulativeQuantity(new BigDecimal("1.5"));
-        data.setAmount(new BigDecimal("150"));
-        data.setCumulativeAmount(new BigDecimal("112.5"));
-        data.setAvgPrice(new BigDecimal("75"));
-        data.setPrice(new BigDecimal("76"));
-        data.setCreateTime(1_700_000_000_123L);
-        RawOrder rawOrder = new RawOrder();
-        rawOrder.setSymbol(symbol);
-        rawOrder.setTime(1_700_000_000_456L);
-        rawOrder.setData(data);
-        return rawOrder;
+    private static PushDataV3ApiWrapper orderPush(String symbol, int status) {
+        return PushDataV3ApiWrapper.newBuilder()
+                .setChannel("spot@private.orders.v3.api.pb")
+                .setSymbol(symbol)
+                .setSendTime(1_700_000_000_456L)
+                .setPrivateOrders(order(status))
+                .build();
     }
 
-    private static RawOhlc rawOhlc(BigDecimal volume, BigDecimal quantity) {
-        RawOhlc rawOhlc = new RawOhlc();
-        rawOhlc.setTime(1_700_000_000_123L);
-        RawOhlc.OhlData data = rawOhlc.new OhlData();
-        RawOhlc.OhlData.OhlcContent content = data.new OhlcContent();
-        content.setOpenTime(1_699_999_980L);
-        content.setCloseTime(1_700_000_040L);
-        content.setOpenPrice(new BigDecimal("70"));
-        content.setHighPrice(new BigDecimal("80"));
-        content.setLowPrice(new BigDecimal("60"));
-        content.setClosePrice(new BigDecimal("75"));
-        content.setVolume(volume);
-        content.setQuantity(quantity);
-        data.setContent(content);
-        rawOhlc.setData(data);
-        return rawOhlc;
+    private static PushDataV3ApiWrapper orderPush(PrivateOrdersV3Api.Builder order) {
+        return orderPush("BTCUSDT", 1).toBuilder().setPrivateOrders(order).build();
+    }
+
+    private static PrivateOrdersV3Api.Builder order(int status) {
+        return PrivateOrdersV3Api.newBuilder()
+                .setId("order-1")
+                .setClientId("client-1")
+                .setTradeType(2)
+                .setOrderType(1)
+                .setStatus(status)
+                .setQuantity("2")
+                .setCumulativeQuantity("1.5")
+                .setAmount("150")
+                .setCumulativeAmount("112.5")
+                .setAvgPrice("75")
+                .setPrice("76")
+                .setCreateTime(1_700_000_000_123L);
+    }
+
+    private static PushDataV3ApiWrapper klinePush(String baseVolume, String quoteAmount) {
+        return PushDataV3ApiWrapper.newBuilder()
+                .setChannel("spot@public.kline.v3.api.pb@BTCUSDT@Min1")
+                .setSymbol("BTCUSDT")
+                .setCreateTime(1_700_000_000_123L)
+                .setPublicSpotKline(PublicSpotKlineV3Api.newBuilder()
+                        .setInterval("Min1")
+                        .setWindowStart(1_699_999_980L)
+                        .setWindowEnd(1_700_000_040L)
+                        .setOpeningPrice("70")
+                        .setHighestPrice("80")
+                        .setLowestPrice("60")
+                        .setClosingPrice("75")
+                        .setVolume(baseVolume)
+                        .setAmount(quoteAmount))
+                .build();
     }
 }

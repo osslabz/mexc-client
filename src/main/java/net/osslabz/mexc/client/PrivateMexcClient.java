@@ -1,7 +1,5 @@
 package net.osslabz.mexc.client;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -10,12 +8,12 @@ import net.osslabz.crypto.Order;
 import net.osslabz.mexc.client.rest.UserDataClient;
 import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
 import net.osslabz.mexc.client.ws.dto.SubscriptionState;
-import net.osslabz.mexc.client.ws.dto.raw.RawOrder;
+import net.osslabz.mexc.proto.PushDataV3ApiWrapper;
 
 @Slf4j
 public class PrivateMexcClient extends MexcClient {
 
-    private static final String ORDER_SUBSCRIPTION_IDENTIFIER = "spot@private.orders.v3.api";
+    private static final String ORDER_SUBSCRIPTION_IDENTIFIER = "spot@private.orders.v3.api.pb";
 
     private final UserDataClient userDataClient;
 
@@ -63,29 +61,17 @@ public class PrivateMexcClient extends MexcClient {
     }
 
     @Override
-    protected Object doHandleMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
-
-        if (isOrder(subscriptionInfo)) {
-            return processOrderMessage(subscriptionInfo, jsonNode);
+    protected Object doHandleMessage(SubscriptionInfo subscriptionInfo, PushDataV3ApiWrapper push) {
+        if (isOrder(subscriptionInfo) && push.hasPrivateOrders()) {
+            Order order = this.mapper.map(push);
+            log.trace("Mapped order: {}", order);
+            return order;
         }
         return null;
     }
 
     private boolean isOrder(SubscriptionInfo subscriptionInfo) {
         return ORDER_SUBSCRIPTION_IDENTIFIER.equals(subscriptionInfo.getSubscriptionIdentifier());
-    }
-
-    private Order processOrderMessage(SubscriptionInfo subscriptionInfo, JsonNode jsonNode) {
-
-        try {
-            RawOrder rawOrder = this.objectMapper.treeToValue(jsonNode, RawOrder.class);
-            log.trace("Order from exchange: {}", rawOrder);
-            Order order = this.mapper.map(subscriptionInfo, rawOrder);
-            log.trace("Mapped order: {}", order);
-            return order;
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private String getActiveListenKey() {

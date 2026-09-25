@@ -16,60 +16,75 @@ import net.osslabz.crypto.OrderAction;
 import net.osslabz.crypto.OrderStatus;
 import net.osslabz.crypto.OrderType;
 import net.osslabz.crypto.TradingAsset;
-import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
-import net.osslabz.mexc.client.ws.dto.raw.RawOhlc;
-import net.osslabz.mexc.client.ws.dto.raw.RawOrder;
+import net.osslabz.mexc.proto.PrivateOrdersV3Api;
+import net.osslabz.mexc.proto.PublicSpotKlineV3Api;
+import net.osslabz.mexc.proto.PushDataV3ApiWrapper;
+import org.apache.commons.lang3.StringUtils;
 
 public class MexcMapper {
 
     public static final ZoneId ZONE_ID_UTC = ZoneId.of("UTC");
 
-    Ohlc map(CurrencyPair currencyPair, Interval interval, RawOhlc rawOhlc) {
+    Ohlc map(CurrencyPair currencyPair, Interval interval, PushDataV3ApiWrapper push) {
 
-        RawOhlc.OhlData.OhlcContent content = rawOhlc.getData().getContent();
+        PublicSpotKlineV3Api kline = push.getPublicSpotKline();
+        // volume is the base quantity traded, amount the quote turnover (成交量 and 成交额 in the schema).
+        BigDecimal quoteVolume = decimal(kline.getAmount());
+        BigDecimal baseQuantity = decimal(kline.getVolume());
+        BigDecimal closePrice = decimal(kline.getClosingPrice());
 
         return Ohlc.builder()
                 .asset(new OhlcAsset(new TradingAsset(Exchange.MEXC, currencyPair), interval))
-                .updateTime(this.epochMillisToDate(rawOhlc.getTime()))
-                .openTime(this.epochSecondsToDate(content.getOpenTime()))
-                .closeTime(this.epochSecondsToDate(content.getCloseTime()))
-                .openPrice(content.getOpenPrice())
-                .highPrice(content.getHighPrice())
-                .lowPrice(content.getLowPrice())
-                .closePrice(content.getClosePrice())
-                .volume(content.getVolume())
-                .quantity(content.getQuantity())
-                .avgPrice(this.calcAvgPrice(content))
+                .updateTime(this.epochMillisToDate(eventTime(push)))
+                .openTime(this.epochSecondsToDate(kline.getWindowStart()))
+                .closeTime(this.epochSecondsToDate(kline.getWindowEnd()))
+                .openPrice(decimal(kline.getOpeningPrice()))
+                .highPrice(decimal(kline.getHighestPrice()))
+                .lowPrice(decimal(kline.getLowestPrice()))
+                .closePrice(closePrice)
+                .volume(quoteVolume)
+                .quantity(baseQuantity)
+                .avgPrice(this.calcAvgPrice(quoteVolume, baseQuantity, closePrice))
                 .build();
     }
 
-    Order map(SubscriptionInfo subscriptionInfo, RawOrder rawOrder) {
+    Order map(PushDataV3ApiWrapper push) {
 
-        if (rawOrder == null || rawOrder.getData() == null) {
-            throw new IllegalArgumentException("rawOrder is null or empty");
+        if (!push.hasPrivateOrders()) {
+            throw new IllegalArgumentException("The push carries no order: " + push.getBodyCase());
         }
 
-        RawOrder.OrderData data = rawOrder.getData();
+        PrivateOrdersV3Api order = push.getPrivateOrders();
 
         return Order.builder()
-                .exchangeOrderId(data.getOrderId())
-                .clientOrderId(data.getClientOrderId())
-                .asset(new TradingAsset(Exchange.MEXC, this.mapCurrencyPair(rawOrder.getSymbol())))
-                .action(this.mapAction(data.getType()))
-                .type(this.mapType(data.getTradeType()))
-                .status(this.mapStatus(data.getStatus()))
-                .quantity(data.getQuantity())
-                .cumulativeQuantity(data.getCumulativeQuantity())
-                .amount(data.getAmount())
-                .cumulativeAmount(data.getCumulativeAmount())
-                .avgPrice(data.getAvgPrice())
-                .price(data.getPrice())
-                .createdAt(epochMillisToDate(data.getCreateTime()))
-                .updatedAt(epochMillisToDate(rawOrder.getTime()))
+                .exchangeOrderId(order.getId())
+                .clientOrderId(StringUtils.defaultIfEmpty(order.getClientId(), null))
+                .asset(new TradingAsset(Exchange.MEXC, this.mapCurrencyPair(push.getSymbol())))
+                .action(this.mapAction(order.getTradeType()))
+                .type(this.mapType(order.getOrderType()))
+                .status(this.mapStatus(order.getStatus()))
+                .quantity(decimal(order.getQuantity()))
+                .cumulativeQuantity(decimal(order.getCumulativeQuantity()))
+                .amount(decimal(order.getAmount()))
+                .cumulativeAmount(decimal(order.getCumulativeAmount()))
+                .avgPrice(decimal(order.getAvgPrice()))
+                .price(decimal(order.getPrice()))
+                .createdAt(epochMillisToDate(order.getCreateTime()))
+                .updatedAt(epochMillisToDate(eventTime(push)))
                 .build();
     }
 
-    private OrderStatus mapStatus(Integer status) {
+    // Kline pushes carry createTime, the orders sample in MEXC's docs sendTime; both are epoch milliseconds.
+    private static long eventTime(PushDataV3ApiWrapper push) {
+        return push.hasCreateTime() ? push.getCreateTime() : push.getSendTime();
+    }
+
+    // proto3 has no null: a field MEXC leaves out reads as the empty string.
+    private static BigDecimal decimal(String value) {
+        return value.isEmpty() ? null : new BigDecimal(value);
+    }
+
+    private OrderStatus mapStatus(int status) {
         // status 1:New order 2:Filled 3:Partially filled 4:Order canceled 5:Order filled partially, and then the rest
         // of the order is canceled
 
@@ -83,19 +98,19 @@ public class MexcMapper {
         };
     }
 
-    private OrderType mapType(Integer tradeType) {
-        return switch (tradeType) {
+    private OrderType mapType(int orderType) {
+        return switch (orderType) {
             case 1 -> OrderType.LIMIT;
             case 5 -> OrderType.MARKET;
-            default -> throw new UnsupportedOperationException("Unsupported tradeType '%d': ".formatted(tradeType));
+            default -> throw new UnsupportedOperationException("Unsupported orderType '%d': ".formatted(orderType));
         };
     }
 
-    private OrderAction mapAction(Integer type) {
-        return switch (type) {
+    private OrderAction mapAction(int tradeType) {
+        return switch (tradeType) {
             case 1 -> OrderAction.BUY;
             case 2 -> OrderAction.SELL;
-            default -> throw new IllegalArgumentException("Invalid order type '%d'".formatted(type));
+            default -> throw new IllegalArgumentException("Invalid tradeType '%d'".formatted(tradeType));
         };
     }
 
@@ -115,10 +130,10 @@ public class MexcMapper {
         return ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSeconds), ZONE_ID_UTC);
     }
 
-    BigDecimal calcAvgPrice(RawOhlc.OhlData.OhlcContent content) {
-        return CryptoMathUtils.isLargerZero(content.getVolume()) && CryptoMathUtils.isLargerZero(content.getQuantity())
-                ? content.getVolume().divide(content.getQuantity(), 8, RoundingMode.HALF_UP)
-                : content.getClosePrice();
+    BigDecimal calcAvgPrice(BigDecimal volume, BigDecimal quantity, BigDecimal closePrice) {
+        return CryptoMathUtils.isLargerZero(volume) && CryptoMathUtils.isLargerZero(quantity)
+                ? volume.divide(quantity, 8, RoundingMode.HALF_UP)
+                : closePrice;
     }
 
     public String mapInterval(Interval interval) {
@@ -140,7 +155,7 @@ public class MexcMapper {
     }
 
     String calcSubscriptionIdentifier(CurrencyPair currencyPair, Interval interval) {
-        return "spot@public.kline.v3.api@" + currencyPair.baseCurrencyCode() + currencyPair.counterCurrencyCode() + "@"
-                + mapInterval(interval);
+        return "spot@public.kline.v3.api.pb@" + currencyPair.baseCurrencyCode() + currencyPair.counterCurrencyCode()
+                + "@" + mapInterval(interval);
     }
 }

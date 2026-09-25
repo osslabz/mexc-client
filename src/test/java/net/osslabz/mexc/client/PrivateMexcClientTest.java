@@ -3,12 +3,12 @@ package net.osslabz.mexc.client;
 import static net.osslabz.mexc.client.rest.LocalServer.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -20,27 +20,49 @@ import mockwebserver3.Dispatcher;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
+import net.osslabz.crypto.CurrencyPair;
+import net.osslabz.crypto.Exchange;
 import net.osslabz.crypto.Order;
 import net.osslabz.crypto.OrderAction;
 import net.osslabz.crypto.OrderStatus;
 import net.osslabz.crypto.OrderType;
+import net.osslabz.crypto.TradingAsset;
 import net.osslabz.mexc.client.rest.LocalServer;
 import net.osslabz.mexc.client.rest.MexcRestClient;
 import net.osslabz.mexc.client.rest.UserDataClient;
 import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
+import net.osslabz.mexc.proto.PrivateDealsV3Api;
+import net.osslabz.mexc.proto.PrivateOrdersV3Api;
+import net.osslabz.mexc.proto.PushDataV3ApiWrapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class PrivateMexcClientTest {
 
-    private static final String CHANNEL = "spot@private.orders.v3.api";
+    private static final String CHANNEL = "spot@private.orders.v3.api.pb";
 
-    private static final String ORDER_UPDATE = """
-            {"c":"spot@private.orders.v3.api","s":"BTCUSDT","t":1700000000123,
-             "d":{"i":"order-1","c":"client-1","S":1,"o":1,"s":1,"p":"76","v":"2","a":"152",
-                  "ap":"0","cv":"0","ca":"0","O":1700000000100}}
-            """;
+    /** The sample push of https://www.mexc.com/api-docs/spot-v3/websocket-user-data-streams/spot-account-orders */
+    private static final PushDataV3ApiWrapper ORDER_UPDATE = PushDataV3ApiWrapper.newBuilder()
+            .setChannel(CHANNEL)
+            .setSymbol("MXUSDT")
+            .setSendTime(1_736_417_034_281L)
+            .setPrivateOrders(PrivateOrdersV3Api.newBuilder()
+                    .setId("C02__505979017439002624115")
+                    .setPrice("3.5121")
+                    .setQuantity("1")
+                    .setAmount("0")
+                    .setAvgPrice("3.6962")
+                    .setOrderType(5)
+                    .setTradeType(2)
+                    .setRemainAmount("0")
+                    .setRemainQuantity("0")
+                    .setLastDealQuantity("1")
+                    .setCumulativeQuantity("1")
+                    .setCumulativeAmount("3.6962")
+                    .setStatus(2)
+                    .setCreateTime(1_736_417_034_259L))
+            .build();
 
     private MockWebServer restServer;
 
@@ -119,11 +141,11 @@ class PrivateMexcClientTest {
 
         client.subscribeToOrders((Order order) -> orders.add(order));
         exchange.takeCommand();
-        exchange.push(ORDER_UPDATE);
+        exchange.push(ORDER_UPDATE.toByteArray());
 
         Order order = orders.poll(5, TimeUnit.SECONDS);
         assertNotNull(order);
-        assertEquals("order-1", order.getExchangeOrderId());
+        assertEquals("C02__505979017439002624115", order.getExchangeOrderId());
         awaitResponses(3);
     }
 
@@ -166,17 +188,41 @@ class PrivateMexcClientTest {
     @Test
     void mapsAnOrderUpdate() throws Exception {
         connect("{\"listenKey\":[]}");
-        JsonNode message = new ObjectMapper().readTree(ORDER_UPDATE);
 
         Order order = (Order) client.doHandleMessage(
-                SubscriptionInfo.builder().subscriptionIdentifier(CHANNEL).build(), message);
+                SubscriptionInfo.builder().subscriptionIdentifier(CHANNEL).build(), ORDER_UPDATE);
 
-        assertEquals("order-1", order.getExchangeOrderId());
-        assertEquals(OrderAction.BUY, order.getAction());
-        assertEquals(OrderType.LIMIT, order.getType());
-        assertEquals(OrderStatus.NEW, order.getStatus());
-        assertEquals(new BigDecimal("76"), order.getPrice());
-        assertEquals(ZonedDateTime.parse("2023-11-14T22:13:20.100Z[UTC]"), order.getCreatedAt());
+        assertEquals("C02__505979017439002624115", order.getExchangeOrderId());
+        assertEquals(new TradingAsset(Exchange.MEXC, new CurrencyPair("MX", "USDT")), order.getAsset());
+        assertEquals(OrderAction.SELL, order.getAction());
+        assertEquals(OrderType.MARKET, order.getType());
+        assertEquals(OrderStatus.FILLED, order.getStatus());
+        assertEquals(new BigDecimal("3.5121"), order.getPrice());
+        assertEquals(new BigDecimal("1"), order.getQuantity());
+        assertEquals(new BigDecimal("0"), order.getAmount());
+        assertEquals(new BigDecimal("3.6962"), order.getAvgPrice());
+        assertEquals(new BigDecimal("1"), order.getCumulativeQuantity());
+        assertEquals(new BigDecimal("3.6962"), order.getCumulativeAmount());
+        assertEquals(ZonedDateTime.parse("2025-01-09T10:03:54.259Z[UTC]"), order.getCreatedAt());
+        assertEquals(ZonedDateTime.parse("2025-01-09T10:03:54.281Z[UTC]"), order.getUpdatedAt());
+        awaitResponses(1);
+    }
+
+    @Test
+    void mapsNothingButOrders() throws Exception {
+        connect("{\"listenKey\":[]}");
+        SubscriptionInfo orders =
+                SubscriptionInfo.builder().subscriptionIdentifier(CHANNEL).build();
+        SubscriptionInfo deals = SubscriptionInfo.builder()
+                .subscriptionIdentifier("spot@private.deals.v3.api.pb")
+                .build();
+        PushDataV3ApiWrapper deal = PushDataV3ApiWrapper.newBuilder()
+                .setChannel(CHANNEL)
+                .setPrivateDeals(PrivateDealsV3Api.getDefaultInstance())
+                .build();
+
+        assertNull(client.doHandleMessage(orders, deal));
+        assertNull(client.doHandleMessage(deals, ORDER_UPDATE));
         awaitResponses(1);
     }
 

@@ -77,6 +77,10 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         broadcast(message);
     }
 
+    void push(byte[] frame) {
+        broadcast(frame);
+    }
+
     void dropConnections() {
         getConnections().forEach(WebSocket::close);
     }

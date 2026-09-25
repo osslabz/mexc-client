@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
-import net.osslabz.crypto.Ohlc;
 import net.osslabz.crypto.Order;
 import net.osslabz.mexc.client.rest.UserDataClient;
 import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
@@ -28,7 +27,7 @@ public class PrivateMexcClient extends MexcClient {
         this.userDataClient = userDataClient;
     }
 
-    public void subscribeToOrders(Consumer<Ohlc> callback) {
+    public void subscribeToOrders(Consumer<Order> callback) {
 
         String listenKey = this.getActiveListenKey();
         this.uri = this.baseUri + "?listenKey=" + listenKey;

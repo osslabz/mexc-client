@@ -2,6 +2,7 @@ package net.osslabz.mexc.client;
 
 import static net.osslabz.mexc.client.rest.LocalServer.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import ch.qos.logback.classic.Level;
@@ -10,6 +11,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import mockwebserver3.Dispatcher;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
@@ -29,6 +33,12 @@ import org.junit.jupiter.api.Test;
 class PrivateMexcClientTest {
 
     private static final String CHANNEL = "spot@private.orders.v3.api";
+
+    private static final String ORDER_UPDATE = """
+            {"c":"spot@private.orders.v3.api","s":"BTCUSDT","t":1700000000123,
+             "d":{"i":"order-1","c":"client-1","S":1,"o":1,"s":1,"p":"76","v":"2","a":"152",
+                  "ap":"0","cv":"0","ca":"0","O":1700000000100}}
+            """;
 
     private MockWebServer restServer;
 
@@ -97,13 +107,24 @@ class PrivateMexcClientTest {
     }
 
     @Test
+    void subscribeToOrdersDeliversOrderUpdatesToTheCallback() throws Exception {
+        connect("{\"listenKey\":[\"key-1\"]}");
+        BlockingQueue<Order> orders = new LinkedBlockingQueue<>();
+
+        client.subscribeToOrders((Order order) -> orders.add(order));
+        exchange.takeCommand();
+        exchange.push(ORDER_UPDATE);
+
+        Order order = orders.poll(5, TimeUnit.SECONDS);
+        assertNotNull(order);
+        assertEquals("order-1", order.getExchangeOrderId());
+        awaitResponses(3);
+    }
+
+    @Test
     void mapsAnOrderUpdate() throws Exception {
         connect("{\"listenKey\":[]}");
-        JsonNode message = new ObjectMapper().readTree("""
-                {"c":"spot@private.orders.v3.api","s":"BTCUSDT","t":1700000000123,
-                 "d":{"i":"order-1","c":"client-1","S":1,"o":1,"s":1,"p":"76","v":"2","a":"152",
-                      "ap":"0","cv":"0","ca":"0","O":1700000000100}}
-                """);
+        JsonNode message = new ObjectMapper().readTree(ORDER_UPDATE);
 
         Order order = (Order) client.doHandleMessage(
                 SubscriptionInfo.builder().subscriptionIdentifier(CHANNEL).build(), message);

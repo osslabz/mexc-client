@@ -30,14 +30,14 @@ class MexcMapperTest {
     private final MexcMapper mapper = new MexcMapper();
 
     @ParameterizedTest
-    @CsvSource({"PT1M,Min1", "PT5M,Min5", "PT15M,Min15", "PT30M,Min30", "PT4H,Hour4", "PT24H,Day1"})
+    @CsvSource({"PT1M,Min1", "PT5M,Min5", "PT15M,Min15", "PT30M,Min30", "PT1H,Min60", "PT4H,Hour4", "PT24H,Day1"})
     void mapIntervalReturnsTheMexcName(Interval interval, String expected) {
         assertEquals(expected, mapper.mapInterval(interval));
     }
 
     @Test
     void mapIntervalRejectsAnIntervalMexcDoesNotStream() {
-        assertThrows(IllegalArgumentException.class, () -> mapper.mapInterval(Interval.PT1H));
+        assertThrows(IllegalArgumentException.class, () -> mapper.mapInterval(Interval.PT12H));
     }
 
     @Test

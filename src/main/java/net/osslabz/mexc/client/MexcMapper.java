@@ -142,6 +142,7 @@ public class MexcMapper {
             case 5 * 60 -> "Min5";
             case 15 * 60 -> "Min15";
             case 30 * 60 -> "Min30";
+            case 60 * 60 -> "Min60";
             case 4 * 60 * 60 -> "Hour4";
             case 8 * 60 * 60 -> "Hour8";
             case 24 * 60 * 60 -> "Day1";

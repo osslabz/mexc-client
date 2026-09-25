@@ -65,7 +65,7 @@ public class MexcMapper {
                 .avgPrice(data.getAvgPrice())
                 .price(data.getPrice())
                 .createdAt(epochMillisToDate(data.getCreateTime()))
-                .updatedAt(epochSecondsToDate(rawOrder.getTime()))
+                .updatedAt(epochMillisToDate(rawOrder.getTime()))
                 .build();
     }
 

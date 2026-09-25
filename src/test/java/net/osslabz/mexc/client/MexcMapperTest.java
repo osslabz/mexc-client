@@ -94,6 +94,7 @@ class MexcMapperTest {
         assertEquals(new BigDecimal("75"), order.getAvgPrice());
         assertEquals(new BigDecimal("76"), order.getPrice());
         assertEquals(ZonedDateTime.parse("2023-11-14T22:13:20.123Z[UTC]"), order.getCreatedAt());
+        assertEquals(ZonedDateTime.parse("2023-11-14T22:13:20.456Z[UTC]"), order.getUpdatedAt());
     }
 
     @ParameterizedTest
@@ -165,6 +166,7 @@ class MexcMapperTest {
         data.setCreateTime(1_700_000_000_123L);
         RawOrder rawOrder = new RawOrder();
         rawOrder.setSymbol(symbol);
+        rawOrder.setTime(1_700_000_000_456L);
         rawOrder.setData(data);
         return rawOrder;
     }

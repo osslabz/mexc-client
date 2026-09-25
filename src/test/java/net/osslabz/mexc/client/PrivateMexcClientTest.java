@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -98,12 +99,17 @@ class PrivateMexcClientTest {
                 return json(401, "{\"code\":\"10072\",\"msg\":\"Api key info invalid\"}");
             }
         });
-        userDataClient = LocalServer.userDataClient(restServer);
-        client = new PrivateMexcClient(exchange.uri(), userDataClient);
+        try (CapturedLog keepAliveLog = CapturedLog.of(UserDataClient.class)) {
+            userDataClient = LocalServer.userDataClient(restServer);
+            client = new PrivateMexcClient(exchange.uri(), userDataClient);
 
-        RuntimeException e = assertThrows(RuntimeException.class, () -> client.subscribeToOrders(ignored -> {}));
-        assertEquals("Api key info invalid", e.getMessage());
-        awaitResponses(2);
+            RuntimeException e = assertThrows(RuntimeException.class, () -> client.subscribeToOrders(ignored -> {}));
+            assertEquals("Api key info invalid", e.getMessage());
+            awaitResponses(2);
+            assertEquals(
+                    List.of("Keeping the listen keys alive failed, next try in PT30M: Api key info invalid"),
+                    keepAliveLog.await(Level.WARN, "Keeping the listen keys alive failed", 1));
+        }
     }
 
     @Test

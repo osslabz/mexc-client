@@ -6,9 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import ch.qos.logback.classic.Level;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import mockwebserver3.Dispatcher;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
@@ -72,6 +74,31 @@ class UserDataClientOfflineTest {
     }
 
     @Test
+    void keepsTheListenKeysAliveAfterAFailedRound() throws Exception {
+        AtomicInteger gets = new AtomicInteger();
+        server.setDispatcher(new Dispatcher() {
+            @Override
+            public MockResponse dispatch(RecordedRequest request) {
+                if ("GET".equals(request.getMethod()) && gets.incrementAndGet() == 1) {
+                    return json(503, "{\"code\":\"700003\",\"msg\":\"Server busy\"}");
+                }
+                return new ExchangeDispatcher("{\"listenKey\":[\"key-1\"]}").dispatch(request);
+            }
+        });
+        try (CapturedLog keepAliveLog = CapturedLog.of(UserDataClient.class)) {
+            client = new UserDataClient(LocalServer.restClient(server), Duration.ofMillis(250));
+
+            assertEquals(List.of("GET", "GET", "PUT"), takeMethodsInOrder(3));
+            client.close();
+
+            restLog.await(Level.TRACE, "<-- END HTTP", 3);
+            assertEquals(
+                    List.of("Keeping the listen keys alive failed, next try in PT0.25S: Server busy"),
+                    keepAliveLog.messages(Level.WARN));
+        }
+    }
+
+    @Test
     void getListenKeysThrowsWhenTheExchangeRejectsTheRequest() throws Exception {
         server.setDispatcher(new Dispatcher() {
             @Override
@@ -79,11 +106,25 @@ class UserDataClientOfflineTest {
                 return json(401, "{\"code\":\"10072\",\"msg\":\"Api key info invalid\"}");
             }
         });
-        client = LocalServer.userDataClient(server);
+        try (CapturedLog keepAliveLog = CapturedLog.of(UserDataClient.class)) {
+            client = LocalServer.userDataClient(server);
 
-        RuntimeException e = assertThrows(RuntimeException.class, client::getListenKeys);
-        assertEquals("Api key info invalid", e.getMessage());
-        assertEquals(List.of("GET", "GET"), takeMethods(2));
+            RuntimeException e = assertThrows(RuntimeException.class, client::getListenKeys);
+            assertEquals("Api key info invalid", e.getMessage());
+            assertEquals(List.of("GET", "GET"), takeMethods(2));
+            assertEquals(
+                    List.of("Keeping the listen keys alive failed, next try in PT30M: Api key info invalid"),
+                    keepAliveLog.await(Level.WARN, "Keeping the listen keys alive failed", 1));
+        }
+    }
+
+    private List<String> takeMethodsInOrder(int count) throws InterruptedException {
+        List<String> methods = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            RecordedRequest request = server.takeRequest(5, TimeUnit.SECONDS);
+            methods.add(request == null ? null : request.getMethod());
+        }
+        return methods;
     }
 
     /**

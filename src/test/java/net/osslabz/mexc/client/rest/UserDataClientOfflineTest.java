@@ -66,12 +66,8 @@ class UserDataClientOfflineTest {
         client = LocalServer.userDataClient(server);
 
         assertEquals("GET", server.takeRequest(5, TimeUnit.SECONDS).getMethod());
-        assertEquals(
-                "listenKey=key-1",
-                server.takeRequest(5, TimeUnit.SECONDS).getBody().utf8());
-        assertEquals(
-                "listenKey=key-2",
-                server.takeRequest(5, TimeUnit.SECONDS).getBody().utf8());
+        assertEquals("key-1", server.takeRequest(5, TimeUnit.SECONDS).getUrl().queryParameter("listenKey"));
+        assertEquals("key-2", server.takeRequest(5, TimeUnit.SECONDS).getUrl().queryParameter("listenKey"));
         restLog.await(Level.TRACE, "<-- END HTTP", 3);
     }
 

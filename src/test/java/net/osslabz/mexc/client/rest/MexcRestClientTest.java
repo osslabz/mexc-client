@@ -13,6 +13,8 @@ import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
 import net.osslabz.mexc.client.rest.dto.ListenKey;
 import net.osslabz.mexc.client.rest.dto.ListenKeys;
+import net.osslabz.mexc.client.utils.SignatureUtil;
+import okhttp3.HttpUrl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,14 +74,20 @@ class MexcRestClientTest {
     }
 
     @Test
-    void putSendsTheParametersAsBody() throws Exception {
+    void putSendsTheParametersInTheSignedQuery() throws Exception {
         server.enqueue(json("{\"listenKey\":\"key-1\"}"));
 
         client.put("/api/v3/userDataStream", Map.of("listenKey", "key-1"), ListenKey.class);
 
         RecordedRequest request = takeRequest();
         assertEquals("PUT", request.getMethod());
-        assertEquals("listenKey=key-1", request.getBody().utf8());
+        assertEquals(0, request.getBodySize());
+        HttpUrl url = request.getUrl();
+        assertEquals("key-1", url.queryParameter("listenKey"));
+        assertEquals(
+                SignatureUtil.actualSignature(
+                        "listenKey=key-1&timestamp=" + url.queryParameter("timestamp"), "secret-key"),
+                url.queryParameter("signature"));
     }
 
     @Test

@@ -85,12 +85,16 @@ public class MexcRestClient {
     }
 
     <T> T post(String uri, Map<String, String> params, Class<T> clazz) {
+        return sendWithQueryOnly("POST", uri, params, clazz);
+    }
+
+    // Sends the parameters in the query, where the interceptor signs them; MEXC signs query plus body.
+    private <T> T sendWithQueryOnly(String method, String uri, Map<String, String> params, Class<T> clazz) {
         try {
-            String url = createUrl(uri, params);
             Response response = okHttpClient
                     .newCall(new Request.Builder()
-                            .url(url)
-                            .post(RequestBody.create(new byte[0], null))
+                            .url(createUrl(uri, params))
+                            .method(method, RequestBody.create(new byte[0], null))
                             .header("Content-Length", "0")
                             .build())
                     .execute();
@@ -121,17 +125,7 @@ public class MexcRestClient {
     }
 
     <T> T put(String uri, Map<String, String> params, Class<T> clazz) {
-        try {
-            Response response = okHttpClient
-                    .newCall(new Request.Builder()
-                            .url(requestHost.concat(uri))
-                            .put(RequestBody.create(SignatureUtil.toQueryString(params), MediaType.get("text/plain")))
-                            .build())
-                    .execute();
-            return handleResponse(response, clazz);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return sendWithQueryOnly("PUT", uri, params, clazz);
     }
 
     <T> T delete(String uri, Map<String, String> params, Class<T> clazz) {

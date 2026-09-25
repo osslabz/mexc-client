@@ -4,7 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -15,7 +18,10 @@ import org.java_websocket.exceptions.WebsocketNotConnectedException;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
-/** A local stand-in for MEXC's websocket endpoint that answers subscriptions with a fixed code or blocks them. */
+/**
+ * A local stand-in for MEXC's websocket endpoint that answers subscriptions with a fixed code or blocks them, and
+ * answers a repeated subscription on the same connection with an empty message, as MEXC does.
+ */
 final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -65,6 +71,10 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         return commands.poll(10, TimeUnit.SECONDS);
     }
 
+    JsonNode takeCommand(Duration timeout) throws InterruptedException {
+        return commands.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
     String takeOpenedResource() throws InterruptedException {
         return openedResources.poll(5, TimeUnit.SECONDS);
     }
@@ -102,6 +112,7 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     @Override
     public void onOpen(WebSocket connection, ClientHandshake handshake) {
+        connection.setAttachment(ConcurrentHashMap.<String>newKeySet());
         openedResources.add(handshake.getResourceDescriptor());
     }
 
@@ -120,13 +131,31 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
                 .createObjectNode()
                 .put("id", command.get("id").asInt())
                 .put("code", subscription ? subscriptionAnswerCode : 0)
-                .put("msg", subscription && blocksSubscriptions ? blockedAnswer(channel) : channel)
+                .put(
+                        "msg",
+                        subscription
+                                ? subscriptionAnswer(connection, channel)
+                                : unsubscriptionAnswer(connection, channel))
                 .toString();
         try {
             connection.send(answer);
         } catch (WebsocketNotConnectedException e) {
             // close() sends its unsubscriptions and disconnects without waiting for the answers.
         }
+    }
+
+    private String subscriptionAnswer(WebSocket connection, String channel) {
+        if (blocksSubscriptions) {
+            return blockedAnswer(channel);
+        }
+        Set<String> subscribed = connection.getAttachment();
+        return subscribed.add(channel) ? channel : "";
+    }
+
+    private static String unsubscriptionAnswer(WebSocket connection, String channel) {
+        Set<String> subscribed = connection.getAttachment();
+        subscribed.remove(channel);
+        return channel;
     }
 
     /** The answer wbs-api.mexc.com gave to a JSON kline channel on 2026-09-25. */

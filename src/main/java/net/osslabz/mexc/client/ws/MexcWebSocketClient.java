@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.exceptions.WebsocketNotConnectedException;
 import org.java_websocket.handshake.ServerHandshake;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,13 +94,25 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     @Override
     public void send(String message) {
+        open();
+        log.trace("Sending message={}", message);
+        super.send(message);
+    }
+
+    /**
+     * Opens the connection unless it is open; the listener's onOpen has run when this returns.
+     *
+     * @throws WebsocketNotConnectedException if the connection can't be opened
+     */
+    public void open() {
         if (!this.isOpen()) {
             synchronized (lock) {
                 start();
             }
         }
-        log.trace("Sending message={}", message);
-        super.send(message);
+        if (!this.isOpen()) {
+            throw new WebsocketNotConnectedException();
+        }
     }
 
     private void start() {

@@ -128,7 +128,7 @@ public abstract class MexcClient implements Closeable {
         if (!activeSubscriptions.isEmpty()) {
             log.info("Trying to (re-)subscribe {} subscription(s)", activeSubscriptions.size());
             this.activeSubscriptions.forEach(
-                    (identifier, ohlcSubscriptionInfo) -> this.subscribe(ohlcSubscriptionInfo));
+                    (identifier, ohlcSubscriptionInfo) -> this.sendSubscription(ohlcSubscriptionInfo));
         }
     }
 
@@ -237,9 +237,20 @@ public abstract class MexcClient implements Closeable {
     }
 
     protected void subscribe(SubscriptionInfo subscriptionInfo) {
+        activeSubscriptions.put(subscriptionInfo.getSubscriptionIdentifier(), subscriptionInfo);
+
+        MexcWebSocketClient client = this.getWebSocketClient();
+        if (client.isOpen()) {
+            this.sendSubscription(subscriptionInfo);
+        } else {
+            // Opening subscribes every active subscription, this one included; MEXC answers a second request with "".
+            client.open();
+        }
+    }
+
+    private void sendSubscription(SubscriptionInfo subscriptionInfo) {
         int requestId = this.getNextRequestId();
         subscriptionInfo.setSubscribeRequestId(requestId);
-        activeSubscriptions.put(subscriptionInfo.getSubscriptionIdentifier(), subscriptionInfo);
 
         this.send(new SubscriptionCommand(
                 requestId, Method.SUBSCRIPTION, List.of(subscriptionInfo.getSubscriptionIdentifier())));

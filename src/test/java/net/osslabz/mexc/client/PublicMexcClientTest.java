@@ -4,11 +4,14 @@ import static net.osslabz.mexc.client.LocalExchange.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.HexFormat;
 import java.util.concurrent.BlockingQueue;
@@ -17,11 +20,13 @@ import java.util.concurrent.TimeUnit;
 import net.osslabz.crypto.CurrencyPair;
 import net.osslabz.crypto.Interval;
 import net.osslabz.crypto.Ohlc;
+import net.osslabz.mexc.client.ws.MexcWebSocketClient;
 import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
 import net.osslabz.mexc.client.ws.dto.SubscriptionState;
 import net.osslabz.mexc.proto.PublicDealsV3Api;
 import net.osslabz.mexc.proto.PublicSpotKlineV3Api;
 import net.osslabz.mexc.proto.PushDataV3ApiWrapper;
+import org.java_websocket.exceptions.WebsocketNotConnectedException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,6 +73,31 @@ class PublicMexcClientTest {
         assertEquals("SUBSCRIPTION", command.get("method").asText());
         assertEquals(CHANNEL, command.get("params").get(0).asText());
         await(() -> state() == SubscriptionState.SUBSCRIBED);
+    }
+
+    @Test
+    void theFirstSubscriptionSendsASingleCommand() throws Exception {
+        connect(0);
+
+        client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);
+
+        assertEquals(CHANNEL, exchange.takeCommand().get("params").get(0).asText());
+        await(() -> state() == SubscriptionState.SUBSCRIBED);
+        assertNull(exchange.takeCommand(Duration.ofSeconds(1)));
+        assertEquals(SubscriptionState.SUBSCRIBED, state());
+    }
+
+    @Test
+    void subscribeFailsWhenTheExchangeIsUnreachable() throws Exception {
+        connect(0);
+        exchange.close();
+
+        try (CapturedLog connectionLog = CapturedLog.of(MexcWebSocketClient.class)) {
+            assertThrows(
+                    WebsocketNotConnectedException.class,
+                    () -> client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add));
+            connectionLog.await(Level.WARN, "connection error with message=", 1);
+        }
     }
 
     @Test
@@ -201,8 +231,6 @@ class PublicMexcClientTest {
         connect(0);
         client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);
         await(() -> state() == SubscriptionState.SUBSCRIBED);
-        // The first connect subscribes twice: from subscribe itself and from the resubscribe in onOpen.
-        exchange.takeCommand();
         exchange.takeCommand();
 
         for (int drop = 1; drop <= 2; drop++) {

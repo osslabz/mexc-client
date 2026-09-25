@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit;
 import net.osslabz.mexc.client.rest.dto.ErrorResponse;
 import net.osslabz.mexc.client.utils.SignatureInterceptor;
 import net.osslabz.mexc.client.utils.SignatureUtil;
-import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -129,19 +128,7 @@ public class MexcRestClient {
     }
 
     <T> T delete(String uri, Map<String, String> params, Class<T> clazz) {
-        try {
-            return handleResponse(
-                    okHttpClient
-                            .newCall(new Request.Builder()
-                                    .url(requestHost.concat(uri))
-                                    .delete(RequestBody.create(
-                                            SignatureUtil.toQueryString(params), MediaType.get("text/plain")))
-                                    .build())
-                            .execute(),
-                    clazz);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return sendWithQueryOnly("DELETE", uri, params, clazz);
     }
 
     private <T> T handleResponse(Response response, Class<T> clazz) {

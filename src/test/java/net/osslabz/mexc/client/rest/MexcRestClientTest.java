@@ -91,14 +91,20 @@ class MexcRestClientTest {
     }
 
     @Test
-    void deleteSendsTheParametersAsBody() throws Exception {
+    void deleteSendsTheParametersInTheSignedQuery() throws Exception {
         server.enqueue(json("{\"listenKey\":\"key-1\"}"));
 
         client.delete("/api/v3/userDataStream", Map.of("listenKey", "key-1"), ListenKey.class);
 
         RecordedRequest request = takeRequest();
         assertEquals("DELETE", request.getMethod());
-        assertEquals("listenKey=key-1", request.getBody().utf8());
+        assertEquals(0, request.getBodySize());
+        HttpUrl url = request.getUrl();
+        assertEquals("key-1", url.queryParameter("listenKey"));
+        assertEquals(
+                SignatureUtil.actualSignature(
+                        "listenKey=key-1&timestamp=" + url.queryParameter("timestamp"), "secret-key"),
+                url.queryParameter("signature"));
     }
 
     @Test

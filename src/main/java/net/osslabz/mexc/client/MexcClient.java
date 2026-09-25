@@ -178,46 +178,54 @@ public abstract class MexcClient implements Closeable {
 
     private void processSubscriptionCommandResponse(JsonNode jsonNode) throws JsonProcessingException {
 
-        SubscriptionCommandResponse subscriptionCommandResponse =
+        SubscriptionCommandResponse response =
                 this.objectMapper.treeToValue(jsonNode, SubscriptionCommandResponse.class);
-        String subscriptionIdentifier = subscriptionCommandResponse.getMessage();
+        int requestId = response.getId();
 
-        if (!this.activeSubscriptions.containsKey(subscriptionIdentifier)) {
-            log.warn("Unexpected message for subscriptionIdentifier={}: {}", subscriptionIdentifier, jsonNode);
+        SubscriptionInfo subscriptionInfo = this.activeSubscriptions.values().stream()
+                .filter(subscription -> Objects.equals(requestId, subscription.getSubscribeRequestId())
+                        || Objects.equals(requestId, subscription.getUnsubscribeRequestId()))
+                .findAny()
+                .orElse(null);
+        if (subscriptionInfo == null) {
+            // A reconnect resubscribes under a new id, so answers to the old one end up here.
+            log.debug("Ignoring an answer to request id={} that no subscription awaits: {}", requestId, jsonNode);
             return;
         }
 
-        SubscriptionInfo ohlcSubscriptionInfo = this.activeSubscriptions.get(subscriptionIdentifier);
+        String subscriptionIdentifier = subscriptionInfo.getSubscriptionIdentifier();
+        // MEXC refuses a channel with code 0 too; only an answer naming the channel confirms the request.
+        boolean confirmed = response.isSuccess() && subscriptionIdentifier.equals(response.getMessage());
 
-        if (Objects.equals(subscriptionCommandResponse.getId(), ohlcSubscriptionInfo.getSubscribeRequestId())) {
-            if (subscriptionCommandResponse.isSuccess()) {
-                ohlcSubscriptionInfo.setState(SubscriptionState.SUBSCRIBED);
+        if (Objects.equals(requestId, subscriptionInfo.getSubscribeRequestId())) {
+            if (confirmed) {
+                subscriptionInfo.setState(SubscriptionState.SUBSCRIBED);
                 log.info("Subscription {} successfully subscribed", subscriptionIdentifier);
             } else {
-                ohlcSubscriptionInfo.setState(SubscriptionState.SUBSCRIBE_FAILED);
+                subscriptionInfo.setState(SubscriptionState.SUBSCRIBE_FAILED);
                 log.warn(
-                        "Subscribing to {} failed with code={}",
+                        "Subscribing to {} failed with code={}: {}",
                         subscriptionIdentifier,
-                        subscriptionCommandResponse.getCode());
+                        response.getCode(),
+                        response.getMessage());
             }
             return;
         }
 
-        if (Objects.equals(subscriptionCommandResponse.getId(), ohlcSubscriptionInfo.getUnsubscribeRequestId())) {
-            if (subscriptionCommandResponse.isSuccess()) {
-                activeSubscriptions.remove(subscriptionIdentifier);
-                log.info("Subscription {} successfully unsubscribed", subscriptionIdentifier);
-                if (this.activeSubscriptions.isEmpty()) {
-                    log.info("No open subscriptions, closing connection.");
-                    this.closeConnection();
-                }
-            } else {
-                ohlcSubscriptionInfo.setState(SubscriptionState.UNSUBSCRIBE_FAILED);
-                log.warn(
-                        "Unsubscribing from {} failed with code={}",
-                        subscriptionIdentifier,
-                        subscriptionCommandResponse.getCode());
+        if (confirmed) {
+            activeSubscriptions.remove(subscriptionIdentifier);
+            log.info("Subscription {} successfully unsubscribed", subscriptionIdentifier);
+            if (this.activeSubscriptions.isEmpty()) {
+                log.info("No open subscriptions, closing connection.");
+                this.closeConnection();
             }
+        } else {
+            subscriptionInfo.setState(SubscriptionState.UNSUBSCRIBE_FAILED);
+            log.warn(
+                    "Unsubscribing from {} failed with code={}: {}",
+                    subscriptionIdentifier,
+                    response.getCode(),
+                    response.getMessage());
         }
     }
 

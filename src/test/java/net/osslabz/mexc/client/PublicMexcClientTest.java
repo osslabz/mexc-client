@@ -89,6 +89,32 @@ class PublicMexcClientTest {
     }
 
     @Test
+    void marksASubscriptionTheExchangeBlocksAsFailed() throws Exception {
+        exchange = LocalExchange.startBlocking();
+        client = new PublicMexcClient(exchange.uri());
+
+        client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);
+
+        await(() -> state() == SubscriptionState.SUBSCRIBE_FAILED);
+        clientLog.await(
+                Level.WARN,
+                "Subscribing to %s failed with code=0: %s".formatted(CHANNEL, LocalExchange.blockedAnswer(CHANNEL)),
+                1);
+    }
+
+    @Test
+    void ignoresAnAnswerToARequestItDidNotSend() throws Exception {
+        connect(0);
+        client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);
+        await(() -> state() == SubscriptionState.SUBSCRIBED);
+
+        exchange.push("{\"id\":99,\"code\":1,\"msg\":\"%s\"}".formatted(CHANNEL));
+
+        clientLog.await(Level.DEBUG, "Ignoring an answer to request id=99", 1);
+        assertEquals(SubscriptionState.SUBSCRIBED, state());
+    }
+
+    @Test
     void resubscribesEachTimeTheExchangeDropsTheConnection() throws Exception {
         connect(0);
         client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);

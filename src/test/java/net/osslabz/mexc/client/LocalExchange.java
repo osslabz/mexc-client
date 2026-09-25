@@ -15,7 +15,7 @@ import org.java_websocket.exceptions.WebsocketNotConnectedException;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
-/** A local stand-in for MEXC's websocket endpoint that answers subscriptions with a fixed code. */
+/** A local stand-in for MEXC's websocket endpoint that answers subscriptions with a fixed code or blocks them. */
 final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -28,16 +28,27 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     private final AtomicInteger clientCloses = new AtomicInteger();
 
-    private volatile int subscriptionAnswerCode;
+    private final int subscriptionAnswerCode;
 
-    private LocalExchange() {
+    private final boolean blocksSubscriptions;
+
+    private LocalExchange(int subscriptionAnswerCode, boolean blocksSubscriptions) {
         super(new InetSocketAddress("localhost", 0));
         setReuseAddr(true);
+        this.subscriptionAnswerCode = subscriptionAnswerCode;
+        this.blocksSubscriptions = blocksSubscriptions;
     }
 
     static LocalExchange start(int subscriptionAnswerCode) throws InterruptedException {
-        LocalExchange exchange = new LocalExchange();
-        exchange.subscriptionAnswerCode = subscriptionAnswerCode;
+        return start(new LocalExchange(subscriptionAnswerCode, false));
+    }
+
+    /** Refuses every subscription the way MEXC refuses a channel it no longer serves: with code 0. */
+    static LocalExchange startBlocking() throws InterruptedException {
+        return start(new LocalExchange(0, true));
+    }
+
+    private static LocalExchange start(LocalExchange exchange) throws InterruptedException {
         exchange.start();
         if (!exchange.started.await(5, TimeUnit.SECONDS)) {
             throw new IllegalStateException("local exchange did not start");
@@ -99,17 +110,24 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
             throw new IllegalStateException(e);
         }
         commands.add(command);
+        boolean subscription = "SUBSCRIPTION".equals(command.get("method").asText());
+        String channel = command.get("params").get(0).asText();
         String answer = OBJECT_MAPPER
                 .createObjectNode()
                 .put("id", command.get("id").asInt())
-                .put("code", "SUBSCRIPTION".equals(command.get("method").asText()) ? subscriptionAnswerCode : 0)
-                .put("msg", command.get("params").get(0).asText())
+                .put("code", subscription ? subscriptionAnswerCode : 0)
+                .put("msg", subscription && blocksSubscriptions ? blockedAnswer(channel) : channel)
                 .toString();
         try {
             connection.send(answer);
         } catch (WebsocketNotConnectedException e) {
             // close() sends its unsubscriptions and disconnects without waiting for the answers.
         }
+    }
+
+    /** The answer wbs-api.mexc.com gave to a JSON kline channel on 2026-09-25. */
+    static String blockedAnswer(String channel) {
+        return "Not Subscribed successfully! [%s].  Reason： Blocked! ".formatted(channel);
     }
 
     @Override

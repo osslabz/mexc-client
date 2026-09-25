@@ -15,6 +15,7 @@ guarantee.
 Features:
 ---------
 - OHLC streaming for all supported intervals
+- Order updates of your own account, with the listen key kept alive
 - Robust connection lost detection with automatic re-connect and resubscribe to previously subscribed topics
 
 
@@ -58,17 +59,26 @@ search that repository by default, so a build that wants a snapshot declares it:
 Usage
 ------
 
+Market data needs no API key:
+
 ```java
+PublicMexcClient client = new PublicMexcClient();
+client.subscribeToOhlc(new CurrencyPair("BTC", "USDT"), Interval.PT1M, ohlc -> log.debug("{}", ohlc));
 
-MexcClient client = new MexcClient();
-client.subscribe(new CurrencyPair("BTC", "USDT"), Interval.PT1M, ohlc -> {
-    log.debug("{}", ohlc);
-});
-
-
-client.unsubscribe(new CurrencyPair("BTC", "USDT"), Interval.PT1M);
+client.unsubscribeFromOhlc(new CurrencyPair("BTC", "USDT"), Interval.PT1M);
 client.close();
-```        
+```
+
+Order updates of your own account need an API key. The client keeps its listen key alive until `close()`, and a closed
+client can't subscribe again:
+
+```java
+PrivateMexcClient client = new PrivateMexcClient(accessKey, secretKey);
+client.subscribeToOrders(order -> log.debug("{}", order));
+
+client.unsubscribeFromOrders();
+client.close();
+```
 
 Logging
 ------

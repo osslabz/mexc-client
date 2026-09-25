@@ -3,6 +3,7 @@ package net.osslabz.mexc.client;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
 import net.osslabz.crypto.Order;
@@ -18,6 +19,8 @@ public class PrivateMexcClient extends MexcClient {
 
     private final UserDataClient userDataClient;
 
+    private final AtomicBoolean closed = new AtomicBoolean();
+
     public PrivateMexcClient(String accessKey, String secretKey) {
         this(BASE_URI, new UserDataClient(accessKey, secretKey));
     }
@@ -28,6 +31,9 @@ public class PrivateMexcClient extends MexcClient {
     }
 
     public void subscribeToOrders(Consumer<Order> callback) {
+        if (closed.get()) {
+            throw new IllegalStateException("The client is closed");
+        }
 
         String listenKey = this.getActiveListenKey();
         this.uri = this.baseUri + "?listenKey=" + listenKey;
@@ -43,6 +49,17 @@ public class PrivateMexcClient extends MexcClient {
 
     public void unsubscribeFromOrders() {
         this.unsubscribe(ORDER_SUBSCRIPTION_IDENTIFIER);
+    }
+
+    /** Closes the connection and stops the listen key keep-alive; the client can't subscribe again afterwards. */
+    @Override
+    public void close() {
+        closed.set(true);
+        try {
+            super.close();
+        } finally {
+            userDataClient.close();
+        }
     }
 
     @Override

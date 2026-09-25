@@ -4,6 +4,7 @@ import static net.osslabz.mexc.client.rest.LocalServer.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -61,7 +62,6 @@ class PrivateMexcClientTest {
     @AfterEach
     void stop() throws InterruptedException {
         client.close();
-        userDataClient.close();
         exchange.close();
         restServer.close();
         restLog.close();
@@ -122,6 +122,42 @@ class PrivateMexcClientTest {
     }
 
     @Test
+    void closeStopsTheListenKeyKeepAlive() throws Exception {
+        connect("{\"listenKey\":[\"key-1\"]}");
+        client.subscribeToOrders(ignored -> {});
+        awaitResponses(3);
+
+        client.close();
+
+        LocalExchange.await(() -> !keepAliveRunning());
+    }
+
+    @Test
+    void subscribeToOrdersAfterCloseThrows() throws Exception {
+        connect("{\"listenKey\":[\"key-1\"]}");
+        awaitResponses(2);
+
+        client.close();
+
+        IllegalStateException e =
+                assertThrows(IllegalStateException.class, () -> client.subscribeToOrders(ignored -> {}));
+        assertEquals("The client is closed", e.getMessage());
+    }
+
+    @Test
+    void unsubscribingFromOrdersKeepsTheListenKeyAlive() throws Exception {
+        connect("{\"listenKey\":[\"key-1\"]}");
+        client.subscribeToOrders(ignored -> {});
+        exchange.takeCommand();
+
+        client.unsubscribeFromOrders();
+        exchange.awaitClientCloses(1);
+
+        assertKeepAliveKeepsRunning();
+        awaitResponses(3);
+    }
+
+    @Test
     void mapsAnOrderUpdate() throws Exception {
         connect("{\"listenKey\":[]}");
         JsonNode message = new ObjectMapper().readTree(ORDER_UPDATE);
@@ -136,6 +172,20 @@ class PrivateMexcClientTest {
         assertEquals(new BigDecimal("76"), order.getPrice());
         assertEquals(ZonedDateTime.parse("2023-11-14T22:13:20.100Z[UTC]"), order.getCreatedAt());
         awaitResponses(1);
+    }
+
+    /** The connection closes before the keep-alive would stop, so this watches for a while. */
+    private static void assertKeepAliveKeepsRunning() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (System.nanoTime() < deadline) {
+            assertTrue(keepAliveRunning());
+            Thread.sleep(10);
+        }
+    }
+
+    private static boolean keepAliveRunning() {
+        return Thread.getAllStackTraces().keySet().stream()
+                .anyMatch(thread -> "mexc-listen-key-keep-alive".equals(thread.getName()) && thread.isAlive());
     }
 
     /** Waits until the listen key requests, including the keep-alive round at start-up, are answered. */

@@ -90,6 +90,10 @@ public abstract class MexcClient implements Closeable {
 
     @Override
     public void close() {
+        closeConnection();
+    }
+
+    private void closeConnection() {
 
         synchronized (this.objectMapper) {
             if (this.webSocketClient == null) {
@@ -205,7 +209,7 @@ public abstract class MexcClient implements Closeable {
                 log.info("Subscription {} successfully unsubscribed", subscriptionIdentifier);
                 if (this.activeSubscriptions.isEmpty()) {
                     log.info("No open subscriptions, closing connection.");
-                    this.close();
+                    this.closeConnection();
                 }
             } else {
                 ohlcSubscriptionInfo.setState(SubscriptionState.UNSUBSCRIBE_FAILED);

@@ -12,6 +12,9 @@ import net.osslabz.mexc.client.rest.dto.ListenKeys;
 public class UserDataClient {
 
     public static final String USER_DATA_STREAM_LISTEN_KEY = "/api/v3/userDataStream";
+
+    private static final String KEEP_ALIVE_THREAD_NAME = "mexc-listen-key-keep-alive";
+
     private final MexcRestClient restClient;
 
     private final ScheduledExecutorService scheduler;
@@ -25,7 +28,7 @@ public class UserDataClient {
     UserDataClient(MexcRestClient restClient) {
         this.restClient = restClient;
 
-        this.scheduler = Executors.newScheduledThreadPool(1);
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(task -> new Thread(task, KEEP_ALIVE_THREAD_NAME));
         this.listenKeyKeepAlive = scheduler.scheduleAtFixedRate(
                 () -> this.getListenKeys().forEach(this::keepAliveListenKey), 0, 30, TimeUnit.MINUTES);
     }

@@ -93,6 +93,14 @@ Prone, Spotless and a JaCoCo coverage floor. Tests tagged `live` call the real M
 `UserDataClientTest` needs `MEXC_API_KEY` and `MEXC_SECRET_KEY`. Run them with
 `mvn test -Dgroups=live -Dsurefire.excluded.groups=`.
 
+Protobuf schemas
+------
+MEXC pushes websocket data as protobuf. `src/main/proto` holds a copy of the schemas from
+[mexcdevelop/websocket-proto](https://github.com/mexcdevelop/websocket-proto) (Apache-2.0, license alongside) at commit
+`0c9c4f35dd0fadc3a46a350e909a93379d81e811`, with `java_package` changed to `net.osslabz.mexc.proto`. The build
+generates the Java classes with `protobuf-maven-plugin`. To update, copy the upstream files over the vendored ones,
+reapply the package and the first-line source comment with the new commit, and run `mvn verify`.
+
 Compatibility
 ------
 mexc-client targets Java 17.

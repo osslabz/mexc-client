@@ -1,0 +1,22 @@
+// Vendored from https://github.com/mexcdevelop/websocket-proto at 0c9c4f35dd0fadc3a46a350e909a93379d81e811 (Apache-2.0); java_package changed.
+// spot@public.deals.v3.api.pb
+
+syntax = "proto3";
+
+option java_package = "net.osslabz.mexc.proto";
+option optimize_for = SPEED;
+option java_multiple_files = true;
+option java_outer_classname = "PublicDealsV3ApiProto";
+
+message PublicDealsV3Api {
+
+  repeated PublicDealsV3ApiItem deals  = 1;
+  string eventType = 2;
+}
+
+message PublicDealsV3ApiItem {
+  string price = 1;
+  string quantity = 2;
+  int32 tradeType = 3;
+  int64 time = 4;
+}

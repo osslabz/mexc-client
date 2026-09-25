@@ -1,0 +1,24 @@
+// Vendored from https://github.com/mexcdevelop/websocket-proto at 0c9c4f35dd0fadc3a46a350e909a93379d81e811 (Apache-2.0); java_package changed.
+// spot@public.cny.v2.pb
+
+syntax = "proto3";
+
+option java_package = "net.osslabz.mexc.proto";
+option optimize_for = SPEED;
+option java_multiple_files = true;
+option java_outer_classname = "PrivateAccountV3ApiProto";
+
+message PrivateAccountV3Api {
+
+  string vcoinName = 1;
+  string coinId = 2;
+
+  string balanceAmount = 3;
+  string balanceAmountChange = 4;
+  string frozenAmount = 5;
+  string frozenAmountChange = 6;
+
+  string type = 7;
+
+  int64 time = 8;
+}

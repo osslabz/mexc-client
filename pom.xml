@@ -24,6 +24,7 @@
         <jackson.version>2.22.2</jackson.version>
         <okhttp.version>5.5.0</okhttp.version>
         <lombok.version>1.18.48</lombok.version>
+        <protobuf.version>4.36.2</protobuf.version>
         <surefire.excluded.groups>live</surefire.excluded.groups>
 
         <!-- Floors, not targets: measured coverage minus five points, capped at 0.90 line and
@@ -103,6 +104,12 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>${protobuf.version}</version>
         </dependency>
 
         <dependency>
@@ -293,6 +300,16 @@
     </profiles>
 
     <build>
+        <resources>
+            <!-- The vendored .proto files are Apache-2.0; the jar ships their licence with the classes generated from them. -->
+            <resource>
+                <directory>src/main/proto</directory>
+                <includes>
+                    <include>LICENSE</include>
+                </includes>
+                <targetPath>META-INF/websocket-proto</targetPath>
+            </resource>
+        </resources>
         <pluginManagement>
             <plugins>
                 <!-- Maven binds these by itself, with versions that come from the Maven running
@@ -333,6 +350,24 @@
                     <excludedGroups>${surefire.excluded.groups}</excludedGroups>
                 </configuration>
             </plugin>
+            <!-- Generates the MEXC websocket push messages from src/main/proto into target/generated-sources. -->
+            <plugin>
+                <groupId>io.github.ascopes</groupId>
+                <artifactId>protobuf-maven-plugin</artifactId>
+                <version>5.1.10</version>
+                <configuration>
+                    <protoc>${protobuf.version}</protoc>
+                    <!-- The jar ships the generated classes only; bare .proto files at its root could shadow a user's own copy. -->
+                    <embedSourcesInClassOutputs>false</embedSourcesInClassOutputs>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -346,7 +381,8 @@
                     <compilerArgs>
                         <arg>-XDcompilePolicy=simple</arg>
                         <arg>--should-stop=ifError=FLOW</arg>
-                        <arg>-Xplugin:ErrorProne</arg>
+                        <!-- The protoc output in target/generated-sources is not code anyone edits. -->
+                        <arg>-Xplugin:ErrorProne -XepExcludedPaths:.*/target/generated-sources/.*</arg>
                         <arg>-Werror</arg>
                     </compilerArgs>
                     <annotationProcessorPaths>
@@ -410,6 +446,12 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.15</version>
+                <!-- The floor measures the code in src/main/java, not the generated protobuf messages. -->
+                <configuration>
+                    <excludes>
+                        <exclude>net/osslabz/mexc/proto/**</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -479,6 +521,10 @@
                 </dependencies>
                 <configuration>
                     <configLocation>${project.basedir}/config/checkstyle.xml</configLocation>
+                    <!-- protobuf-maven-plugin adds its output to the compile source roots, which Checkstyle audits by default. -->
+                    <sourceDirectories>
+                        <sourceDirectory>${project.build.sourceDirectory}</sourceDirectory>
+                    </sourceDirectories>
                     <includeTestSourceDirectory>false</includeTestSourceDirectory>
                 </configuration>
                 <executions>
@@ -512,6 +558,10 @@
                         <ruleset>${project.basedir}/config/pmd-ruleset.xml</ruleset>
                     </rulesets>
                     <printFailingErrors>true</printFailingErrors>
+                    <!-- Same reason as the Checkstyle source directories: protoc output, not code anyone edits. -->
+                    <excludeRoots>
+                        <excludeRoot>${project.build.directory}/generated-sources/protobuf</excludeRoot>
+                    </excludeRoots>
                     <!-- No web server for the cross-reference report. -->
                     <linkXRef>false</linkXRef>
                 </configuration>

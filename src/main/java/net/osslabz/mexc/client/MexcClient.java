@@ -9,6 +9,7 @@ import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,6 +42,8 @@ public abstract class MexcClient implements Closeable {
 
     protected String uri;
 
+    private final Duration pingInterval;
+
     private MexcWebSocketClient webSocketClient;
 
     public MexcClient() {
@@ -48,42 +51,48 @@ public abstract class MexcClient implements Closeable {
     }
 
     MexcClient(String baseUri) {
+        this(baseUri, MexcWebSocketClient.PING_INTERVAL);
+    }
+
+    MexcClient(String baseUri, Duration pingInterval) {
         this.objectMapper = new ObjectMapper();
         this.objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         this.baseUri = baseUri;
         this.uri = baseUri;
+        this.pingInterval = pingInterval;
     }
 
     private void initWebSocketClient() {
 
         try {
-            this.webSocketClient = new MexcWebSocketClient(new URI(this.uri), new WebSocketListener() {
-                @Override
-                public void onOpen() {
-                    resubscribe();
-                }
+            this.webSocketClient =
+                    new MexcWebSocketClient(new URI(this.uri), this.pingInterval, new WebSocketListener() {
+                        @Override
+                        public void onOpen() {
+                            resubscribe();
+                        }
 
-                @Override
-                public void onMessage(String message) {
-                    log.trace("Received message: {}", message);
-                    handleMessage(message);
-                }
+                        @Override
+                        public void onMessage(String message) {
+                            log.trace("Received message: {}", message);
+                            handleMessage(message);
+                        }
 
-                @Override
-                public void onMessage(ByteBuffer bytes) {
-                    handlePush(bytes);
-                }
+                        @Override
+                        public void onMessage(ByteBuffer bytes) {
+                            handlePush(bytes);
+                        }
 
-                @Override
-                public void onError(Exception e) {
-                    // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
-                }
+                        @Override
+                        public void onError(Exception e) {
+                            // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
+                        }
 
-                @Override
-                public void onClose(int code, String reason, boolean remote) {
-                    // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
-                }
-            });
+                        @Override
+                        public void onClose(int code, String reason, boolean remote) {
+                            // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
+                        }
+                    });
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
@@ -137,6 +146,10 @@ public abstract class MexcClient implements Closeable {
         try {
             JsonNode jsonNode = this.objectMapper.readTree(message);
 
+            if (this.isPong(jsonNode)) {
+                log.trace("Received PONG");
+                return;
+            }
             if (this.isSubscriptionCommandResponse(jsonNode)) {
                 this.processSubscriptionCommandResponse(jsonNode);
                 return;
@@ -230,6 +243,10 @@ public abstract class MexcClient implements Closeable {
                     response.getCode(),
                     response.getMessage());
         }
+    }
+
+    private boolean isPong(JsonNode jsonNode) {
+        return "PONG".equals(jsonNode.path("msg").asText());
     }
 
     private boolean isSubscriptionCommandResponse(JsonNode jsonNode) {

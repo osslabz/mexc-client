@@ -101,6 +101,21 @@ class PublicMexcClientTest {
     }
 
     @Test
+    void pingsKeepAQuietConnectionOpen() throws Exception {
+        exchange = LocalExchange.startClosingIdleConnections(Duration.ofMillis(500));
+        client = new PublicMexcClient(exchange.uri(), Duration.ofMillis(100));
+        client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);
+        await(() -> state() == SubscriptionState.SUBSCRIBED);
+
+        Thread.sleep(1500);
+
+        assertEquals(0, exchange.clientCloses());
+        assertTrue(exchange.pings() >= 5, "only " + exchange.pings() + " pings");
+        clientLog.await(Level.TRACE, "Received PONG", 5);
+        assertTrue(clientLog.messages(Level.DEBUG).isEmpty());
+    }
+
+    @Test
     void deliversTheKlinesOfASubscribedChannel() throws Exception {
         connect(0);
         client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);

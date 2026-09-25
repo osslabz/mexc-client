@@ -2,6 +2,7 @@ package net.osslabz.mexc.client.ws;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -17,10 +18,18 @@ import org.slf4j.LoggerFactory;
 public class MexcWebSocketClient extends WebSocketClient {
 
     private static final Logger log = LoggerFactory.getLogger(MexcWebSocketClient.class);
+
+    /** MEXC closes a connection that carries no data for 60 seconds; its PING command counts as data. */
+    public static final Duration PING_INTERVAL = Duration.ofSeconds(20);
+
+    private static final String PING = "{\"method\":\"PING\"}";
+
     private final WebSocketListener listener;
 
     private final Object lock = new Object();
     private final AtomicReference<ScheduledFuture<?>> reconnectMonitor = new AtomicReference<>();
+
+    private final AtomicReference<ScheduledFuture<?>> pinger = new AtomicReference<>();
 
     private final AtomicBoolean connected = new AtomicBoolean();
 
@@ -34,10 +43,17 @@ public class MexcWebSocketClient extends WebSocketClient {
         return thread;
     });
 
+    private final Duration pingInterval;
+
     public MexcWebSocketClient(URI serverURI, WebSocketListener webSocketListener) {
+        this(serverURI, PING_INTERVAL, webSocketListener);
+    }
+
+    public MexcWebSocketClient(URI serverURI, Duration pingInterval, WebSocketListener webSocketListener) {
         super(serverURI);
         this.setConnectionLostTimeout(5);
         this.listener = webSocketListener;
+        this.pingInterval = pingInterval;
     }
 
     @Override
@@ -65,6 +81,20 @@ public class MexcWebSocketClient extends WebSocketClient {
                     1,
                     3,
                     TimeUnit.SECONDS));
+            this.pinger.set(scheduler.scheduleAtFixedRate(
+                    this::ping, pingInterval.toMillis(), pingInterval.toMillis(), TimeUnit.MILLISECONDS));
+        }
+    }
+
+    // A websocket ping frame doesn't count as data for MEXC; only its PING command does.
+    private void ping() {
+        if (this.isOpen()) {
+            try {
+                log.trace("Sending message={}", PING);
+                super.send(PING);
+            } catch (WebsocketNotConnectedException e) {
+                log.debug("Couldn't ping, the connection closed meanwhile");
+            }
         }
     }
 
@@ -134,6 +164,7 @@ public class MexcWebSocketClient extends WebSocketClient {
         this.scheduler.shutdown();
         super.close();
         this.reconnectMonitor.set(null);
+        this.pinger.set(null);
     }
 
     boolean isConnected() {

@@ -18,6 +18,7 @@ Features:
 - OHLC streaming for all supported intervals
 - Order updates of your own account, with the listen key kept alive
 - Robust connection lost detection with automatic re-connect and resubscribe to previously subscribed topics
+- A PING every 20 seconds, since MEXC closes a connection that carries no data for a minute
 
 
 

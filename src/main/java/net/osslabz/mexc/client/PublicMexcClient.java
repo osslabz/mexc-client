@@ -1,5 +1,6 @@
 package net.osslabz.mexc.client;
 
+import java.time.Duration;
 import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
 import net.osslabz.crypto.CurrencyPair;
@@ -19,6 +20,10 @@ public class PublicMexcClient extends MexcClient {
 
     PublicMexcClient(String baseUri) {
         super(baseUri);
+    }
+
+    PublicMexcClient(String baseUri, Duration pingInterval) {
+        super(baseUri, pingInterval);
     }
 
     public void subscribeToOhlc(CurrencyPair currencyPair, Interval interval, Consumer<Ohlc> callback) {

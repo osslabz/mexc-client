@@ -5,11 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -20,7 +24,8 @@ import org.java_websocket.server.WebSocketServer;
 
 /**
  * A local stand-in for MEXC's websocket endpoint that answers subscriptions with a fixed code or blocks them, and
- * answers a repeated subscription on the same connection with an empty message, as MEXC does.
+ * answers a repeated subscription on the same connection with an empty message, as MEXC does. Like MEXC, it can close
+ * connections the client has sent nothing on for a while.
  */
 final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
@@ -33,6 +38,16 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     private final BlockingQueue<String> openedResources = new LinkedBlockingQueue<>();
 
     private final AtomicInteger clientCloses = new AtomicInteger();
+
+    private final AtomicInteger pings = new AtomicInteger();
+
+    private final Map<WebSocket, Long> lastClientMessageNanos = new ConcurrentHashMap<>();
+
+    private final ScheduledExecutorService idleCheck = Executors.newSingleThreadScheduledExecutor(task -> {
+        Thread thread = new Thread(task, "local-exchange-idle-check");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private final int subscriptionAnswerCode;
 
@@ -52,6 +67,22 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     /** Refuses every subscription the way MEXC refuses a channel it no longer serves: with code 0. */
     static LocalExchange startBlocking() throws InterruptedException {
         return start(new LocalExchange(0, true));
+    }
+
+    /** Closes a connection once the client has sent nothing on it for {@code idleTimeout}. */
+    static LocalExchange startClosingIdleConnections(Duration idleTimeout) throws InterruptedException {
+        LocalExchange exchange = start(new LocalExchange(0, false));
+        long timeoutNanos = idleTimeout.toNanos();
+        ScheduledFuture<?> unusedIdleCheck = exchange.idleCheck.scheduleWithFixedDelay(
+                () -> exchange.lastClientMessageNanos.forEach((connection, lastMessage) -> {
+                    if (System.nanoTime() - lastMessage > timeoutNanos) {
+                        connection.close();
+                    }
+                }),
+                10,
+                10,
+                TimeUnit.MILLISECONDS);
+        return exchange;
     }
 
     private static LocalExchange start(LocalExchange exchange) throws InterruptedException {
@@ -77,6 +108,14 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     String takeOpenedResource() throws InterruptedException {
         return openedResources.poll(5, TimeUnit.SECONDS);
+    }
+
+    int clientCloses() {
+        return clientCloses.get();
+    }
+
+    int pings() {
+        return pings.get();
     }
 
     void awaitClientCloses(int count) throws InterruptedException {
@@ -113,16 +152,23 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     @Override
     public void onOpen(WebSocket connection, ClientHandshake handshake) {
         connection.setAttachment(ConcurrentHashMap.<String>newKeySet());
+        lastClientMessageNanos.put(connection, System.nanoTime());
         openedResources.add(handshake.getResourceDescriptor());
     }
 
     @Override
     public void onMessage(WebSocket connection, String message) {
+        lastClientMessageNanos.put(connection, System.nanoTime());
         JsonNode command;
         try {
             command = OBJECT_MAPPER.readTree(message);
         } catch (IOException e) {
             throw new IllegalStateException(e);
+        }
+        if ("PING".equals(command.get("method").asText())) {
+            pings.incrementAndGet();
+            answer(connection, "{\"id\":0,\"code\":0,\"msg\":\"PONG\"}");
+            return;
         }
         commands.add(command);
         boolean subscription = "SUBSCRIPTION".equals(command.get("method").asText());
@@ -137,6 +183,10 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
                                 ? subscriptionAnswer(connection, channel)
                                 : unsubscriptionAnswer(connection, channel))
                 .toString();
+        answer(connection, answer);
+    }
+
+    private static void answer(WebSocket connection, String answer) {
         try {
             connection.send(answer);
         } catch (WebsocketNotConnectedException e) {
@@ -165,6 +215,7 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     @Override
     public void onClose(WebSocket connection, int code, String reason, boolean remote) {
+        lastClientMessageNanos.remove(connection);
         clientCloses.incrementAndGet();
     }
 
@@ -175,6 +226,7 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     @Override
     public void close() throws InterruptedException {
+        idleCheck.shutdownNow();
         stop(1000);
     }
 }

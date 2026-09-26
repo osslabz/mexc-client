@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.Closeable;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
@@ -15,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import net.osslabz.mexc.client.ws.MexcWebSocketClient;
 import net.osslabz.mexc.client.ws.WebSocketListener;
@@ -24,6 +24,7 @@ import net.osslabz.mexc.client.ws.dto.SubscriptionCommandResponse;
 import net.osslabz.mexc.client.ws.dto.SubscriptionInfo;
 import net.osslabz.mexc.client.ws.dto.SubscriptionState;
 import net.osslabz.mexc.proto.PushDataV3ApiWrapper;
+import org.java_websocket.exceptions.WebsocketNotConnectedException;
 
 @Slf4j
 public abstract class MexcClient implements Closeable {
@@ -64,38 +65,37 @@ public abstract class MexcClient implements Closeable {
 
     private void initWebSocketClient() {
 
-        try {
-            this.webSocketClient =
-                    new MexcWebSocketClient(new URI(this.uri), this.pingInterval, new WebSocketListener() {
-                        @Override
-                        public void onOpen() {
-                            resubscribe();
-                        }
+        // The listener resubscribes through the client that opened, so a closed client never builds a new one.
+        AtomicReference<MexcWebSocketClient> opening = new AtomicReference<>();
+        this.webSocketClient =
+                new MexcWebSocketClient(URI.create(this.uri), this.pingInterval, new WebSocketListener() {
+                    @Override
+                    public void onOpen() {
+                        resubscribe(opening.get());
+                    }
 
-                        @Override
-                        public void onMessage(String message) {
-                            log.trace("Received message: {}", message);
-                            handleMessage(message);
-                        }
+                    @Override
+                    public void onMessage(String message) {
+                        log.trace("Received message: {}", message);
+                        handleMessage(message);
+                    }
 
-                        @Override
-                        public void onMessage(ByteBuffer bytes) {
-                            handlePush(bytes);
-                        }
+                    @Override
+                    public void onMessage(ByteBuffer bytes) {
+                        handlePush(bytes);
+                    }
 
-                        @Override
-                        public void onError(Exception e) {
-                            // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
-                        }
+                    @Override
+                    public void onError(Exception e) {
+                        // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
+                    }
 
-                        @Override
-                        public void onClose(int code, String reason, boolean remote) {
-                            // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
-                        }
-                    });
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
+                    @Override
+                    public void onClose(int code, String reason, boolean remote) {
+                        // MexcWebSocketClient logs it, and its reconnect monitor restores a dropped connection.
+                    }
+                });
+        opening.set(this.webSocketClient);
     }
 
     @Override
@@ -133,11 +133,15 @@ public abstract class MexcClient implements Closeable {
         }
     }
 
-    private void resubscribe() {
+    private void resubscribe(MexcWebSocketClient client) {
         if (!activeSubscriptions.isEmpty()) {
             log.info("Trying to (re-)subscribe {} subscription(s)", activeSubscriptions.size());
-            this.activeSubscriptions.forEach(
-                    (identifier, ohlcSubscriptionInfo) -> this.sendSubscription(ohlcSubscriptionInfo));
+            try {
+                this.activeSubscriptions.forEach(
+                        (identifier, ohlcSubscriptionInfo) -> this.sendSubscription(client, ohlcSubscriptionInfo));
+            } catch (WebsocketNotConnectedException e) {
+                log.debug("Stopped resubscribing, the connection closed meanwhile");
+            }
         }
     }
 
@@ -258,19 +262,19 @@ public abstract class MexcClient implements Closeable {
 
         MexcWebSocketClient client = this.getWebSocketClient();
         if (client.isOpen()) {
-            this.sendSubscription(subscriptionInfo);
+            this.sendSubscription(client, subscriptionInfo);
         } else {
             // Opening subscribes every active subscription, this one included; MEXC answers a second request with "".
             client.open();
         }
     }
 
-    private void sendSubscription(SubscriptionInfo subscriptionInfo) {
+    private void sendSubscription(MexcWebSocketClient client, SubscriptionInfo subscriptionInfo) {
         int requestId = this.getNextRequestId();
         subscriptionInfo.setSubscribeRequestId(requestId);
 
-        this.send(new SubscriptionCommand(
-                requestId, Method.SUBSCRIPTION, List.of(subscriptionInfo.getSubscriptionIdentifier())));
+        client.send(asJsonString(new SubscriptionCommand(
+                requestId, Method.SUBSCRIPTION, List.of(subscriptionInfo.getSubscriptionIdentifier()))));
     }
 
     protected void unsubscribe(String subscriptionIdentifier) {

@@ -1,8 +1,10 @@
 package net.osslabz.mexc.client;
 
 import static net.osslabz.mexc.client.LocalExchange.await;
+import static net.osslabz.mexc.client.LocalExchange.awaitRelease;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -15,8 +17,10 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.HexFormat;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.osslabz.crypto.CurrencyPair;
 import net.osslabz.crypto.Interval;
 import net.osslabz.crypto.Ohlc;
@@ -256,6 +260,42 @@ class PublicMexcClientTest {
             assertEquals("SUBSCRIPTION", command.get("method").asText());
             assertEquals(CHANNEL, command.get("params").get(0).asText());
         }
+    }
+
+    @Test
+    void closeDuringAResubscriptionOpensNoNewConnection() throws Exception {
+        connect(0);
+        CountDownLatch resubscribing = new CountDownLatch(1);
+        CountDownLatch released = new CountDownLatch(1);
+        AtomicInteger subscriptions = new AtomicInteger();
+        SubscriptionInfo subscription = new SubscriptionInfo(CHANNEL, null, null, SubscriptionState.INIT, push -> {}) {
+            @Override
+            public void setSubscribeRequestId(Integer subscribeRequestId) {
+                super.setSubscribeRequestId(subscribeRequestId);
+                if (subscriptions.incrementAndGet() == 2) {
+                    resubscribing.countDown();
+                    awaitRelease(released);
+                }
+            }
+        };
+        client.subscribe(subscription);
+        await(() -> state() == SubscriptionState.SUBSCRIBED);
+        exchange.takeCommand();
+
+        exchange.dropConnections();
+        assertTrue(resubscribing.await(10, TimeUnit.SECONDS), "no resubscription after the drop");
+        client.close();
+        released.countDown();
+
+        clientLog.await(Level.DEBUG, "Stopped resubscribing, the connection closed meanwhile", 1);
+        // One period of the reconnect monitor, which checks every three seconds.
+        long deadline = System.nanoTime() + Duration.ofSeconds(4).toNanos();
+        for (JsonNode command = exchange.takeCommand(Duration.ofSeconds(4));
+                command != null;
+                command = exchange.takeCommand(Duration.ofNanos(Math.max(0, deadline - System.nanoTime())))) {
+            assertNotEquals("SUBSCRIPTION", command.get("method").asText());
+        }
+        assertEquals(2, exchange.handshakes());
     }
 
     @Test

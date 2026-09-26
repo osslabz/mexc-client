@@ -101,7 +101,11 @@ public class MexcMapper {
     private OrderType mapType(int orderType) {
         return switch (orderType) {
             case 1 -> OrderType.LIMIT;
+            case 2 -> OrderType.POST_ONLY;
+            case 3 -> OrderType.IMMEDIATE_OR_CANCEL;
+            case 4 -> OrderType.FILL_OR_KILL;
             case 5 -> OrderType.MARKET;
+            case 100 -> OrderType.STOP_LOSS_TAKE_PROFIT;
             default -> throw new UnsupportedOperationException("Unsupported orderType '%d': ".formatted(orderType));
         };
     }

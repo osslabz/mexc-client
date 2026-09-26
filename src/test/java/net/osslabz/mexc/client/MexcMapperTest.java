@@ -133,9 +133,24 @@ class MexcMapperTest {
         assertEquals(OrderAction.BUY, order.getAction());
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "1,LIMIT",
+        "2,POST_ONLY",
+        "3,IMMEDIATE_OR_CANCEL",
+        "4,FILL_OR_KILL",
+        "5,MARKET",
+        "100,STOP_LOSS_TAKE_PROFIT"
+    })
+    void mapsEveryOrderType(int orderType, OrderType expected) {
+        assertEquals(
+                expected,
+                mapper.map(orderPush(order(1).setOrderType(orderType))).getType());
+    }
+
     @Test
     void mapOrderRejectsAnUnknownOrderType() {
-        PushDataV3ApiWrapper push = orderPush(order(1).setOrderType(3));
+        PushDataV3ApiWrapper push = orderPush(order(1).setOrderType(6));
 
         assertThrows(UnsupportedOperationException.class, () -> mapper.map(push));
     }

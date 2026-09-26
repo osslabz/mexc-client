@@ -31,6 +31,8 @@ public class MexcWebSocketClient extends WebSocketClient {
     // Guarded by lock.
     private boolean connectAttempted;
 
+    private final AtomicBoolean spent = new AtomicBoolean();
+
     private final Object schedulerLock = new Object();
     private final AtomicReference<ScheduledFuture<?>> reconnectMonitor = new AtomicReference<>();
 
@@ -177,7 +179,9 @@ public class MexcWebSocketClient extends WebSocketClient {
     private void start() {
         try {
             log.info("Opening connection...");
-            this.connected.set(this.connectBlocking());
+            boolean opened = this.connectBlocking();
+            this.connected.set(opened);
+            this.spent.set(!opened);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -199,6 +203,11 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     boolean isConnected() {
         return this.connected.get();
+    }
+
+    /** Whether the first connect failed; Java-WebSocket can't connect such a client again. */
+    public boolean isSpent() {
+        return this.spent.get();
     }
 
     public boolean isConnectionAlive() {

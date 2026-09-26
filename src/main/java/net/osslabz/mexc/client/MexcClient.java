@@ -106,7 +106,8 @@ public abstract class MexcClient implements Closeable {
     private void closeConnection() {
 
         synchronized (this.objectMapper) {
-            if (this.webSocketClient == null) {
+            // A spent client never had a connection to unsubscribe on, and subscribing replaces it.
+            if (this.webSocketClient == null || this.webSocketClient.isSpent()) {
                 return;
             }
         }
@@ -295,7 +296,7 @@ public abstract class MexcClient implements Closeable {
 
     private MexcWebSocketClient getWebSocketClient() {
         synchronized (this.objectMapper) {
-            if (this.webSocketClient == null) {
+            if (this.webSocketClient == null || this.webSocketClient.isSpent()) {
                 initWebSocketClient();
             }
             return this.webSocketClient;

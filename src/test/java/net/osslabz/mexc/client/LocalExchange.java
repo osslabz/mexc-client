@@ -15,6 +15,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -22,6 +23,7 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.drafts.Draft;
 import org.java_websocket.exceptions.InvalidDataException;
 import org.java_websocket.exceptions.WebsocketNotConnectedException;
+import org.java_websocket.framing.CloseFrame;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.handshake.ServerHandshakeBuilder;
 import org.java_websocket.server.WebSocketServer;
@@ -29,7 +31,7 @@ import org.java_websocket.server.WebSocketServer;
 /**
  * A local stand-in for MEXC's websocket endpoint that answers subscriptions with a fixed code or blocks them, and
  * answers a repeated subscription on the same connection with an empty message, as MEXC does. Like MEXC, it can close
- * connections the client has sent nothing on for a while. Tests can hold the next opening handshake.
+ * connections the client has sent nothing on for a while. Tests can hold or reject the next opening handshake.
  */
 final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
@@ -48,6 +50,8 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     private final AtomicInteger pings = new AtomicInteger();
 
     private final AtomicInteger handshakes = new AtomicInteger();
+
+    private final AtomicBoolean rejectsNextHandshake = new AtomicBoolean();
 
     private final AtomicReference<HeldHandshake> nextHeldHandshake = new AtomicReference<>();
 
@@ -143,6 +147,11 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         return handshakes.get();
     }
 
+    /** Answers the next opening handshake with an HTTP error instead of accepting it. */
+    void rejectNextHandshake() {
+        rejectsNextHandshake.set(true);
+    }
+
     /** Holds the next opening handshake unanswered until {@link #releaseHandshake()}. */
     void holdNextHandshake() {
         HeldHandshake held = new HeldHandshake();
@@ -204,6 +213,9 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     public ServerHandshakeBuilder onWebsocketHandshakeReceivedAsServer(
             WebSocket connection, Draft draft, ClientHandshake request) throws InvalidDataException {
         handshakes.incrementAndGet();
+        if (rejectsNextHandshake.getAndSet(false)) {
+            throw new InvalidDataException(CloseFrame.POLICY_VALIDATION, "rejected by the test");
+        }
         HeldHandshake held = nextHeldHandshake.getAndSet(null);
         if (held != null) {
             held.hold();

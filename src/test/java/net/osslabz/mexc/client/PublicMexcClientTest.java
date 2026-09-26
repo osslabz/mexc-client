@@ -105,6 +105,40 @@ class PublicMexcClientTest {
     }
 
     @Test
+    void closeAfterAFailedFirstConnectOpensNoConnection() throws Exception {
+        connect(0);
+        exchange.close();
+        try (CapturedLog connectionLog = CapturedLog.of(MexcWebSocketClient.class)) {
+            assertThrows(
+                    WebsocketNotConnectedException.class,
+                    () -> client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add));
+
+            client.close();
+
+            assertEquals(1, connectionLog.messages(Level.WARN).size());
+        }
+        assertTrue(clientLog.messages(Level.WARN).isEmpty());
+    }
+
+    @Test
+    void subscribeConnectsAgainAfterAFailedFirstConnect() throws Exception {
+        connect(0);
+        exchange.rejectNextHandshake();
+        try (CapturedLog connectionLog = CapturedLog.of(MexcWebSocketClient.class)) {
+            assertThrows(
+                    WebsocketNotConnectedException.class,
+                    () -> client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add));
+            connectionLog.await(
+                    Level.INFO, "connection closed with code=1002, reason=Invalid status code received: 404", 1);
+
+            client.subscribeToOhlc(BTC_USDT, Interval.PT1M, received::add);
+
+            await(() -> state() == SubscriptionState.SUBSCRIBED);
+            assertTrue(connectionLog.messages(Level.WARN).isEmpty());
+        }
+    }
+
+    @Test
     void pingsKeepAQuietConnectionOpen() throws Exception {
         exchange = LocalExchange.startClosingIdleConnections(Duration.ofMillis(500));
         client = new PublicMexcClient(exchange.uri(), Duration.ofMillis(100));

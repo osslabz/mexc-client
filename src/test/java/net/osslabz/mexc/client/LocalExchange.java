@@ -18,8 +18,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import org.java_websocket.WebSocket;
+import org.java_websocket.drafts.Draft;
+import org.java_websocket.exceptions.InvalidDataException;
 import org.java_websocket.exceptions.WebsocketNotConnectedException;
 import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.handshake.ServerHandshakeBuilder;
 import org.java_websocket.server.WebSocketServer;
 
 /**
@@ -42,6 +45,8 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     private final AtomicInteger openConnections = new AtomicInteger();
 
     private final AtomicInteger pings = new AtomicInteger();
+
+    private final AtomicInteger handshakes = new AtomicInteger();
 
     private final Map<WebSocket, Long> lastClientMessageNanos = new ConcurrentHashMap<>();
 
@@ -129,6 +134,10 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         await(() -> openConnections.get() == count);
     }
 
+    int handshakes() {
+        return handshakes.get();
+    }
+
     void push(String message) {
         broadcast(message);
     }
@@ -166,6 +175,13 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     @Override
     public void onStart() {
         started.countDown();
+    }
+
+    @Override
+    public ServerHandshakeBuilder onWebsocketHandshakeReceivedAsServer(
+            WebSocket connection, Draft draft, ClientHandshake request) throws InvalidDataException {
+        handshakes.incrementAndGet();
+        return super.onWebsocketHandshakeReceivedAsServer(connection, draft, request);
     }
 
     @Override

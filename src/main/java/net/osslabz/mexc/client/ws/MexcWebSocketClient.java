@@ -62,6 +62,11 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake serverHandshake) {
+        if (this.closed.get()) {
+            // A reconnect that close() came too early to stop.
+            super.close();
+            return;
+        }
         log.debug("New connection opened");
         this.listener.onOpen();
         this.startMonitoringThread();
@@ -77,13 +82,18 @@ public class MexcWebSocketClient extends WebSocketClient {
             log.debug("Starting re-reconnect monitor thread...");
             this.reconnectMonitor.set(scheduler.scheduleWithFixedDelay(
                     () -> {
+                        if (this.closed.get() || this.isOpen()) {
+                            return;
+                        }
                         try {
-                            if (!this.isOpen()) {
-                                log.debug("Trying to reconnect...");
-                                reconnectBlocking();
-                            }
+                            log.debug("Trying to reconnect...");
+                            reconnectBlocking();
                         } catch (Exception e) {
                             log.debug("Couldn't reconnect connection (message={}), will try again!", e.getMessage());
+                        }
+                        // close() may have run after onOpen checked for it.
+                        if (this.closed.get()) {
+                            super.close();
                         }
                     },
                     1,
@@ -140,12 +150,14 @@ public class MexcWebSocketClient extends WebSocketClient {
     /**
      * Opens the connection unless it is open; the listener's onOpen has run when this returns.
      *
-     * @throws WebsocketNotConnectedException if the connection can't be opened
+     * @throws WebsocketNotConnectedException if the connection can't be opened or the client is closed
      */
     public void open() {
         if (!this.isOpen()) {
             synchronized (lock) {
-                start();
+                if (!this.closed.get()) {
+                    start();
+                }
             }
         }
         if (!this.isOpen()) {

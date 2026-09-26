@@ -39,6 +39,8 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
     private final AtomicInteger clientCloses = new AtomicInteger();
 
+    private final AtomicInteger openConnections = new AtomicInteger();
+
     private final AtomicInteger pings = new AtomicInteger();
 
     private final Map<WebSocket, Long> lastClientMessageNanos = new ConcurrentHashMap<>();
@@ -122,6 +124,11 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         await(() -> clientCloses.get() >= count);
     }
 
+    /** Waits until the exchange serves {@code count} connections; it answers a handshake before it serves one. */
+    void awaitOpenConnections(int count) throws InterruptedException {
+        await(() -> openConnections.get() == count);
+    }
+
     void push(String message) {
         broadcast(message);
     }
@@ -144,6 +151,18 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         }
     }
 
+    /** Blocks the calling thread, typically one of the client's or the exchange's, until the test releases it. */
+    static void awaitRelease(CountDownLatch released) {
+        try {
+            if (!released.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("the test never released the blocked thread");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+
     @Override
     public void onStart() {
         started.countDown();
@@ -154,6 +173,7 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         connection.setAttachment(ConcurrentHashMap.<String>newKeySet());
         lastClientMessageNanos.put(connection, System.nanoTime());
         openedResources.add(handshake.getResourceDescriptor());
+        openConnections.incrementAndGet();
     }
 
     @Override
@@ -216,6 +236,7 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     @Override
     public void onClose(WebSocket connection, int code, String reason, boolean remote) {
         lastClientMessageNanos.remove(connection);
+        openConnections.decrementAndGet();
         clientCloses.incrementAndGet();
     }
 

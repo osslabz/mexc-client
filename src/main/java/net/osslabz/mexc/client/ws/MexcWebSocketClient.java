@@ -27,11 +27,15 @@ public class MexcWebSocketClient extends WebSocketClient {
     private final WebSocketListener listener;
 
     private final Object lock = new Object();
+
+    private final Object schedulerLock = new Object();
     private final AtomicReference<ScheduledFuture<?>> reconnectMonitor = new AtomicReference<>();
 
     private final AtomicReference<ScheduledFuture<?>> pinger = new AtomicReference<>();
 
     private final AtomicBoolean connected = new AtomicBoolean();
+
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     private final AtomicReference<Thread> monitorThread = new AtomicReference<>();
 
@@ -65,7 +69,11 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     private void startMonitoringThread() {
 
-        if (this.reconnectMonitor.get() == null) {
+        // close() shuts the scheduler down under this lock, so nothing gets scheduled on a shut-down scheduler.
+        synchronized (this.schedulerLock) {
+            if (this.closed.get() || this.reconnectMonitor.get() != null) {
+                return;
+            }
             log.debug("Starting re-reconnect monitor thread...");
             this.reconnectMonitor.set(scheduler.scheduleWithFixedDelay(
                     () -> {
@@ -161,10 +169,11 @@ public class MexcWebSocketClient extends WebSocketClient {
             super.close();
             return;
         }
-        this.scheduler.shutdown();
+        synchronized (this.schedulerLock) {
+            this.closed.set(true);
+            this.scheduler.shutdown();
+        }
         super.close();
-        this.reconnectMonitor.set(null);
-        this.pinger.set(null);
     }
 
     boolean isConnected() {

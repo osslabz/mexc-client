@@ -28,6 +28,9 @@ public class MexcWebSocketClient extends WebSocketClient {
 
     private final Object lock = new Object();
 
+    // Guarded by lock.
+    private boolean connectAttempted;
+
     private final Object schedulerLock = new Object();
     private final AtomicReference<ScheduledFuture<?>> reconnectMonitor = new AtomicReference<>();
 
@@ -150,12 +153,18 @@ public class MexcWebSocketClient extends WebSocketClient {
     /**
      * Opens the connection unless it is open; the listener's onOpen has run when this returns.
      *
+     * <p>Java-WebSocket connects a client once. Only the first call connects; after that the reconnect monitor
+     * restores a dropped connection.
+     *
      * @throws WebsocketNotConnectedException if the connection can't be opened or the client is closed
      */
     public void open() {
+        // onOpen sends from the read thread while connectBlocking() holds the lock; it gets past here only because
+        // the connection is open by then.
         if (!this.isOpen()) {
             synchronized (lock) {
-                if (!this.closed.get()) {
+                if (!this.closed.get() && !this.connectAttempted) {
+                    this.connectAttempted = true;
                     start();
                 }
             }

@@ -16,6 +16,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import org.java_websocket.WebSocket;
 import org.java_websocket.drafts.Draft;
@@ -28,7 +29,7 @@ import org.java_websocket.server.WebSocketServer;
 /**
  * A local stand-in for MEXC's websocket endpoint that answers subscriptions with a fixed code or blocks them, and
  * answers a repeated subscription on the same connection with an empty message, as MEXC does. Like MEXC, it can close
- * connections the client has sent nothing on for a while.
+ * connections the client has sent nothing on for a while. Tests can hold the next opening handshake.
  */
 final class LocalExchange extends WebSocketServer implements AutoCloseable {
 
@@ -47,6 +48,10 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     private final AtomicInteger pings = new AtomicInteger();
 
     private final AtomicInteger handshakes = new AtomicInteger();
+
+    private final AtomicReference<HeldHandshake> nextHeldHandshake = new AtomicReference<>();
+
+    private volatile HeldHandshake heldHandshake;
 
     private final Map<WebSocket, Long> lastClientMessageNanos = new ConcurrentHashMap<>();
 
@@ -138,6 +143,24 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
         return handshakes.get();
     }
 
+    /** Holds the next opening handshake unanswered until {@link #releaseHandshake()}. */
+    void holdNextHandshake() {
+        HeldHandshake held = new HeldHandshake();
+        heldHandshake = held;
+        nextHeldHandshake.set(held);
+    }
+
+    void awaitHeldHandshake() throws InterruptedException {
+        // The reconnect monitor checks every three seconds.
+        if (!heldHandshake.arrived.await(10, TimeUnit.SECONDS)) {
+            throw new AssertionError("no handshake arrived within 10 seconds");
+        }
+    }
+
+    void releaseHandshake() {
+        heldHandshake.released.countDown();
+    }
+
     void push(String message) {
         broadcast(message);
     }
@@ -181,6 +204,10 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     public ServerHandshakeBuilder onWebsocketHandshakeReceivedAsServer(
             WebSocket connection, Draft draft, ClientHandshake request) throws InvalidDataException {
         handshakes.incrementAndGet();
+        HeldHandshake held = nextHeldHandshake.getAndSet(null);
+        if (held != null) {
+            held.hold();
+        }
         return super.onWebsocketHandshakeReceivedAsServer(connection, draft, request);
     }
 
@@ -265,5 +292,17 @@ final class LocalExchange extends WebSocketServer implements AutoCloseable {
     public void close() throws InterruptedException {
         idleCheck.shutdownNow();
         stop(1000);
+    }
+
+    private static final class HeldHandshake {
+
+        private final CountDownLatch arrived = new CountDownLatch(1);
+
+        private final CountDownLatch released = new CountDownLatch(1);
+
+        void hold() {
+            arrived.countDown();
+            awaitRelease(released);
+        }
     }
 }

@@ -3,6 +3,7 @@ package net.osslabz.mexc.client;
 import static net.osslabz.mexc.client.LocalExchange.await;
 import static net.osslabz.mexc.client.LocalExchange.awaitRelease;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import net.osslabz.mexc.client.ws.MexcWebSocketClient;
 import net.osslabz.mexc.client.ws.WebSocketListener;
 import org.java_websocket.exceptions.WebsocketNotConnectedException;
@@ -117,6 +119,56 @@ class MexcWebSocketClientTest {
                 Duration.ofSeconds(5),
                 () -> assertThrows(WebsocketNotConnectedException.class, () -> client.send(UNSUBSCRIPTION)));
         assertEquals(0, exchange.handshakes());
+    }
+
+    @Test
+    void concurrentOpensConnectOnce() throws Exception {
+        client = new MexcWebSocketClient(URI.create(exchange.uri()), new SilentListener());
+        exchange.holdNextHandshake();
+        AtomicReference<Throwable> firstFailure = new AtomicReference<>();
+        AtomicReference<Throwable> secondFailure = new AtomicReference<>();
+        Thread first = openInBackground(firstFailure);
+        exchange.awaitHeldHandshake();
+
+        Thread second = openInBackground(secondFailure);
+        await(() -> second.getState() == Thread.State.BLOCKED || !second.isAlive());
+        exchange.releaseHandshake();
+        first.join(TimeUnit.SECONDS.toMillis(5));
+        second.join(TimeUnit.SECONDS.toMillis(5));
+
+        assertNull(firstFailure.get());
+        assertNull(secondFailure.get());
+        assertTrue(client.isOpen());
+        assertEquals(1, exchange.handshakes());
+    }
+
+    @Test
+    void sendDuringAReconnectFailsWithoutConnectingAgain() throws Exception {
+        client = new MexcWebSocketClient(URI.create(exchange.uri()), new SilentListener());
+        client.open();
+        exchange.awaitOpenConnections(1);
+        exchange.holdNextHandshake();
+        exchange.dropConnections();
+        exchange.awaitHeldHandshake();
+
+        assertThrows(WebsocketNotConnectedException.class, () -> client.send(UNSUBSCRIPTION));
+
+        exchange.releaseHandshake();
+        await(client::isOpen);
+        assertEquals(2, exchange.handshakes());
+        assertEquals(List.of(), connectionLog.messages(Level.WARN));
+    }
+
+    private Thread openInBackground(AtomicReference<Throwable> failure) {
+        Thread thread = new Thread(() -> {
+            try {
+                client.open();
+            } catch (RuntimeException e) {
+                failure.set(e);
+            }
+        });
+        thread.start();
+        return thread;
     }
 
     private static class SilentListener implements WebSocketListener {

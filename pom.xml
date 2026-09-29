@@ -21,7 +21,7 @@
 
         <maven.compiler.release>${osslabz.java.version}</maven.compiler.release>
 
-        <jackson.version>2.22.2</jackson.version>
+        <jackson.version>2.22.3</jackson.version>
         <okhttp.version>5.5.0</okhttp.version>
         <lombok.version>1.18.48</lombok.version>
         <protobuf.version>4.36.2</protobuf.version>

@@ -22,7 +22,7 @@
         <maven.compiler.release>${osslabz.java.version}</maven.compiler.release>
 
         <jackson.version>2.22.4</jackson.version>
-        <okhttp.version>5.5.0</okhttp.version>
+        <okhttp.version>5.5.1</okhttp.version>
         <lombok.version>1.18.48</lombok.version>
         <protobuf.version>4.36.2</protobuf.version>
         <surefire.excluded.groups>live</surefire.excluded.groups>

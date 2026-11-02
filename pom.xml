@@ -445,7 +445,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.15</version>
+                <version>0.8.16</version>
                 <!-- The floor measures the code in src/main/java, not the generated protobuf messages. -->
                 <configuration>
                     <excludes>
